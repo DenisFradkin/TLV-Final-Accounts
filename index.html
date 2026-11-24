@@ -158,7 +158,7 @@ tr.big td{background:var(--mint);font-weight:800}
  #pv tr{display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;background:var(--card);border-radius:12px;box-shadow:var(--sh);margin-bottom:10px;padding:8px}
  #pv td{display:block;border:0;padding:4px 6px;grid-column:1/-1;min-width:0!important}
  #pv td[data-l]::before{content:attr(data-l);display:block;font-size:12px;color:var(--mute);font-weight:600}
- #pv td.n{grid-column:auto;text-align:start}#pv td.n.c0{grid-column:1/-1}#pv td.e{display:none}
+ #pv td.n{grid-column:auto;text-align:start}#pv td.n.c0{grid-column:1/-1}#pv td.e{display:none}#pv td.e2{text-align:start}
  #pv td input,#pv td select{border-color:var(--line);background:#fff}
  #pv tr.sec{display:block;background:var(--brand);padding:10px 12px}#pv tr.sec td{background:transparent;padding:0}
  #pv tr.tot,#pv tr.big{background:#EAF3F5}#pv tr.big{background:var(--mint)}
@@ -244,7 +244,7 @@ function fmtDT(d){const p=n=>String(n).padStart(2,'0');return `${p(d.getDate())}
 function vatFor(iso,rates){let r=rates[0]?rates[0].rate:18;for(const x of [...rates].sort((a,b)=>a.from<b.from?-1:1)){if(!iso||x.from<=iso)r=x.rate}return r}
 function buildLines(P,grouped){
   const L={exec:[],plan:[],mgmt:[],fee:[],levy:[]};
-  const rows=(P.rows||[]).filter(r=>r.cat&&r.cat!=='skip'&&L[r.cat]);
+  const rows=(P.rows||[]).map((r,i)=>[r,r.ord!=null?r.ord:i+1e6]).sort((a,b)=>a[1]-b[1]).map(x=>x[0]).filter(r=>r.cat&&r.cat!=='skip'&&L[r.cat]);
   if(!grouped){rows.forEach(r=>L[r.cat].push({sup:r.sup,svc:r.svc,date:r.date||'',excl:+r.excl||0,incl:+r.incl||0,note:r.note||'',ids:[r.id]}));return L}
   const m=new Map();
   rows.forEach(r=>{const k=r.cat+'§'+gkey(r);if(!m.has(k)){const o={sup:r.sup,svc:r.svc,date:'',excl:0,incl:0,n:0,notes:[],ids:[]};m.set(k,o);L[r.cat].push(o)}const o=m.get(k);o.excl+=+r.excl||0;o.incl+=+r.incl||0;o.n++;o.ids.push(r.id);if(r.date&&r.date>o.date)o.date=r.date;if(r.note)o.notes.push(r.note)});
@@ -657,10 +657,10 @@ async function readPdf(){
   render();
 }
 function importTabs(){
-  const P=S.P,rates=[...new Set([projVat(),...S.vat.map(x=>x.rate)])];let added=0,flagged=0;
+  const P=S.P,rates=[...new Set([projVat(),...S.vat.map(x=>x.rate)])];let added=0,flagged=0;let ord=P.rows.reduce((m,r)=>Math.max(m,r.ord||0),0);
   (S.tabs||[]).forEach(tb=>{
     const o=OT.apply(tb.T,tb.roles,rates);
-    o.rows.forEach(x=>{const r={id:uid(),sup:x.sup,svc:x.svc,date:x.date||'',excl:x.excl,incl:x.incl,rate:null,calc:'',page:tb.page,note:x.note||'',ok:false,flag:!x.ok,src:'ocr'};
+    o.rows.forEach((x,li)=>{const r={id:uid(),ord:++ord,line:li+1,sup:x.sup,svc:x.svc,date:x.date||'',excl:x.excl,incl:x.incl,rate:null,calc:'',page:tb.page,note:x.note||'',ok:false,flag:!x.ok,src:'ocr'};
       if(r.excl==null&&r.incl!=null)r.calc='excl';fixVat(r);const s=suggest(r);r.cat=s.cat;r.catSrc=s.src;P.rows.push(r);added++;if(r.flag)flagged++});
     if(o.totalIncl&&!P.reportIncl)P.reportIncl=o.totalIncl;if(o.totalExcl&&!P.reportExcl)P.reportExcl=o.totalExcl;
     saveTemplate(tb.T,tb.roles);
@@ -727,7 +727,12 @@ function navRender(){
   $('#orgLine').textContent=S.gen.org||'עיריית תל אביב-יפו · אגף מבני ציבור';
   $('#conn').innerHTML=S.db?'<span class="dot"></span>מחובר למסד הנתונים':'<span class="dot off"></span>מצב מקומי בדפדפן';
 }
-function render(){
+function render(){renderView();fixDateInputs()}
+/* date inputs: commit only when leaving the field (or Enter) and only a real year */
+function fixDateInputs(){document.querySelectorAll('input[type=date]').forEach(i=>{const h=i.onchange;if(!h||i.dataset.fixed)return;i.dataset.fixed='1';i.onchange=null;const start=i.value;
+  const commit=()=>{if(i.value===start)return;const y=+(i.value||'').slice(0,4);if(i.value&&(y<1900||y>2100)){i.style.borderColor='var(--badInk)';toast('שנה לא תקינה – הקלידו שנה בת 4 ספרות');return}i.style.borderColor='';h()};
+  i.onblur=commit;i.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();i.blur()}}})}
+function renderView(){
   const app=$('#app');navRender();
   if(S.view==='boot'){app.innerHTML='<div class="card"><p class="muted">טוען…</p></div>';return}
   if(S.view==='login'){app.innerHTML=loginView();return}
@@ -894,33 +899,34 @@ function sheetView(){
   let nIss=0;
   const line=(l,no,i,k,flab)=>{const one=l.ids.length===1,iss=issues(l);if(iss.length)nIss++;if(S.pvIssues&&!iss.length)return '';
    const r0=one?byId(l.ids[0]):null;
-   return `<tr class="ln" data-ids="${l.ids.join(',')}" ${iss.length?'style="background:var(--warn)"':''}><td class="n c0" style="white-space:nowrap">${one?'<button class="sm ghost" data-delline title="מחיקת שורה" aria-label="מחיקת שורה">✕</button>':''}${no}.${i+1}${r0&&r0.page&&S.pages.length?` <button class="sm ghost" data-scan="${r0.page}" title="הצג בסריקה">עמ' ${r0.page}</button>`:''}</td>
+   return `<tr class="ln" data-ids="${l.ids.join(',')}" ${iss.length?'style="background:var(--warn)"':''}><td class="n c0" style="white-space:nowrap">${no}.${i+1}${r0&&r0.line?`<div class="small muted">שורה ${r0.line} בדוח</div>`:''}${r0&&r0.page&&S.pages.length?` <button class="sm ghost" data-scan="${r0.page}" title="הצג בסריקה">עמ' ${r0.page}</button>`:''}</td>
+    <td data-l="תאריך">${one?`<input type="date" data-lf="date" value="${esc(l.date||'')}" style="width:140px">`:`<span class="small">${esc(fmtD(l.date))}</span>`}</td>
     <td style="min-width:240px" data-l="תאור"><input data-lf="sup" value="${esc(l.sup)}" aria-label="תאור">${iss.length?`<div style="padding:2px 6px">${iss.map(t=>`<div class="small" style="color:var(--warnInk);font-weight:600">⚠ ${t}</div>`).join('')}<button class="sm" data-okline style="margin-top:4px;min-height:28px">✓ בדקתי – תקין</button></div>`:''}</td><td style="min-width:150px" data-l="תפקיד בפרויקט"><input data-lf="svc" value="${esc(l.svc)}" aria-label="תפקיד בפרויקט"></td>
     <td style="min-width:150px" data-l="שיוך (פרק)"><select data-lf="cat" aria-label="שיוך">${k?'':'<option value="" selected>— לבחור פרק —</option>'}${Object.entries(CATS).map(([c,lb])=>`<option value="${c}" ${c===k?'selected':''}>${c===k?flab:lb}</option>`).join('')}</select></td>
     <td class="n" data-l="ללא מע&quot;מ">${one?`<input class="num" data-lf="excl" value="${fx(l.excl)}" style="${r0&&r0.calc==='excl'?'font-style:italic':''}">`:money(l.excl)}</td><td class="n" data-l="כולל מע&quot;מ">${one?`<input class="num" data-lf="incl" value="${fx(l.incl)}" style="${r0&&r0.calc==='incl'?'font-style:italic':''}">`:`<span title="סכום של ${l.ids.length} שורות – לעריכה עברו לתצוגה מפורטת">${money(l.incl)}</span>`}</td>
-    <td class="n" data-l="% מהפרויקט">${pc(l.incl,tot.i)}</td><td class="n" data-l="% מהביצוע">${pc(l.incl,S2.exec.i)}</td><td data-l="הערות"><input data-lf="note" value="${esc(l.note)}" aria-label="הערות"></td><td data-l="תאריך">${one?`<input type="date" data-lf="date" value="${esc(l.date||'')}" style="width:140px">`:`<span class="small">${esc(fmtD(l.date))}</span>`}</td></tr>`};
-  const totRow=(t,v,big)=>`<tr class="${big?'big':'tot'}"><td colspan="4">${t}</td><td class="n" data-l="ללא מע&quot;מ">${money(v.e)}</td><td class="n" data-l="כולל מע&quot;מ">${money(v.i)}</td><td class="n" data-l="% מהפרויקט">${pc(v.i,tot.i)}</td><td class="n" data-l="% מהביצוע">${pc(v.i,S2.exec.i)}</td><td class="e"></td><td class="e"></td></tr>`;
+    <td class="n" data-l="% מהפרויקט">${pc(l.incl,tot.i)}</td><td class="n" data-l="% מהביצוע">${pc(l.incl,S2.exec.i)}</td><td data-l="הערות"><input data-lf="note" value="${esc(l.note)}" aria-label="הערות"></td><td class="e2">${one?'<button class="sm ghost" data-delline title="מחיקת שורה" aria-label="מחיקת שורה">✕ מחיקה</button>':''}</td></tr>`};
+  const totRow=(t,v,big)=>`<tr class="${big?'big':'tot'}"><td colspan="5">${t}</td><td class="n" data-l="ללא מע&quot;מ">${money(v.e)}</td><td class="n" data-l="כולל מע&quot;מ">${money(v.i)}</td><td class="n" data-l="% מהפרויקט">${pc(v.i,tot.i)}</td><td class="n" data-l="% מהביצוע">${pc(v.i,S2.exec.i)}</td><td class="e"></td><td class="e"></td></tr>`;
   const a=+P.area||0,dv=+P.devArea||0,dc=+P.devCost||900,bn=1+(+P.bnm||15)/100,ratio=a?dv/a:0,d5=dc*ratio,d5i=d5*(1+vat/100);
   const p4=a?[tot.e/a,tot.i/a,S2.exec.e/a,S2.exec.i/a]:[0,0,0,0];
   const sq=[['שטח הפרויקט עפ"י היתר (מ"ר)',[m0(a)]],['שטח הפיתוח (מ"ר)',[inp('devArea','num','width:110px')]],['יחס שטח פיתוח/שטח בניה',[ratio.toFixed(2)]],
     ['עלות למ"ר בינוי + פיתוח (₪/מ"ר)',p4.map(m0)],[`עלות פיתוח למ"ר בניה (הנחה: ${inp('devCost','num','width:80px;display:inline-block')} ₪/מ"ר)`,['','',m0(d5),m0(d5i)]],
     ['עלות למ"ר בינוי בסיסי (₪/מ"ר)',['','',m0(p4[2]-d5),m0(p4[3]-d5i)]],[`בניכוי ב.נ.מ. ${inp('bnm','num','width:60px;display:inline-block')}% (₪/מ"ר)`,['','',m0((p4[2]-d5)/bn),m0((p4[3]-d5i)/bn)]]];
-  const un=P.rows.filter(r=>!r.cat);
+  const un=P.rows.filter(r=>!r.cat).sort((a,b)=>(a.ord||1e6)-(b.ord||1e6));
   let reconRows='';
   if(P.reportIncl||P.reportExcl){const dI=P.reportIncl?tot.i-P.reportIncl:null,dE=P.reportExcl?tot.e-P.reportExcl:null,bad=(dI!=null&&Math.abs(dI)>=1)||(dE!=null&&Math.abs(dE)>=1);if(bad)nIss++;
-    reconRows=`<tr style="background:${bad?'var(--bad)':'var(--mint)'}"><td colspan="4"><b>סה"כ לפי הדוח</b> ${inpR('reportExcl')} ${inpR('reportIncl')}</td><td class="n">${P.reportExcl?money(P.reportExcl):''}</td><td class="n">${P.reportIncl?money(P.reportIncl):''}</td><td colspan="4"></td></tr>
-     <tr style="background:${bad?'var(--bad)':'var(--mint)'}"><td colspan="4"><b>${bad?'⚠ הפרש מול הדוח':'✓ תואם לדוח'}</b>${bad?' <span class="small">– בדקו שורות מסומנות, שורות חסרות או שורה שנקלטה פעמיים</span>':''}</td><td class="n"><b>${dE!=null?money(dE):''}</b></td><td class="n"><b>${dI!=null?money(dI):''}</b></td><td colspan="4"></td></tr>`}
-  else{nIss++;reconRows=`<tr style="background:var(--warn)"><td colspan="10">⚠ לא הוזן סה"כ הדוח להשוואה: ללא מע"מ ${inpR('reportExcl')} כולל מע"מ ${inpR('reportIncl')}</td></tr>`}
+    reconRows=`<tr style="background:${bad?'var(--bad)':'var(--mint)'}"><td colspan="5"><b>סה"כ לפי הדוח</b> ${inpR('reportExcl')} ${inpR('reportIncl')}</td><td class="n">${P.reportExcl?money(P.reportExcl):''}</td><td class="n">${P.reportIncl?money(P.reportIncl):''}</td><td colspan="4"></td></tr>
+     <tr style="background:${bad?'var(--bad)':'var(--mint)'}"><td colspan="5"><b>${bad?'⚠ הפרש מול הדוח':'✓ תואם לדוח'}</b>${bad?' <span class="small">– בדקו שורות מסומנות, שורות חסרות או שורה שנקלטה פעמיים</span>':''}</td><td class="n"><b>${dE!=null?money(dE):''}</b></td><td class="n"><b>${dI!=null?money(dI):''}</b></td><td colspan="4"></td></tr>`}
+  else{nIss++;reconRows=`<tr style="background:var(--warn)"><td colspan="11">⚠ לא הוזן סה"כ הדוח להשוואה: ללא מע"מ ${inpR('reportExcl')} כולל מע"מ ${inpR('reportIncl')}</td></tr>`}
   const tbl=`<div class="tblwrap"><table class="rt" id="pv">
-   <thead><tr><th>מס"ד</th><th>תאור</th><th>תפקיד בפרויקט</th><th>שיוך</th><th class="n">ללא מע"מ</th><th class="n">כולל מע"מ</th><th class="n">% מהפרויקט</th><th class="n">% מהביצוע</th><th>הערות</th><th>תאריך</th></tr></thead>
-   <tbody><tr class="sec"><td colspan="10">1. נתונים כלליים <span style="font-weight:400;opacity:.8;font-size:13px">· עדכון אחרון: ${fmtDT(new Date(P.updatedAt))}</span></td></tr>
-   ${gen.map(([k,lb,t],i)=>{const req=FIELDS.find(f=>f[0]===k&&f[2]),miss=req&&(P[k]==null||P[k]==='');if(S.pvIssues&&!miss)return '';if(miss)nIss++;return `<tr ${miss?'style="background:var(--bad)"':''}><td class="n">1.${i+1}</td><td>${lb}${miss?' <b style="color:var(--badInk)">– חובה, חסר</b>':''}</td><td colspan="8">${k==='desc'?`<textarea data-pf="desc" style="min-height:40px;background:#fff">${esc(P.desc||'')}</textarea>`:inp(k,t,'max-width:420px')}</td></tr>`}).join('')}
-   ${un.length?(nIss+=0,`<tr class="sec" style="background:var(--badInk)"><td colspan="10">לא משויך – ${un.length} שורות: בחרו לכל אחת פרק (הן לא ייכללו באקסל עד אז)</td></tr>`+un.map((r,i)=>line({sup:r.sup,svc:r.svc,date:r.date,excl:+r.excl||0,incl:+r.incl||0,note:r.note||'',ids:[r.id]},'?',i,'','')).join('')):''}
-   ${SEC.map(([k,no,title,flab])=>`<tr class="sec"><td colspan="10">${no}. ${title}</td></tr>${L[k].length?L[k].map((l,i)=>line(l,no,i,k,flab)).join(''):'<tr><td></td><td colspan="9" class="muted small">אין שורות בפרק</td></tr>'}${totRow('סה"כ '+title,S2[k])}`).join('')}
+   <thead><tr><th>מס"ד</th><th>תאריך</th><th>תאור</th><th>תפקיד בפרויקט</th><th>שיוך</th><th class="n">ללא מע"מ</th><th class="n">כולל מע"מ</th><th class="n">% מהפרויקט</th><th class="n">% מהביצוע</th><th>הערות</th><th></th></tr></thead>
+   <tbody><tr class="sec"><td colspan="11">1. נתונים כלליים <span style="font-weight:400;opacity:.8;font-size:13px">· עדכון אחרון: ${fmtDT(new Date(P.updatedAt))}</span></td></tr>
+   ${gen.map(([k,lb,t],i)=>{const req=FIELDS.find(f=>f[0]===k&&f[2]),miss=req&&(P[k]==null||P[k]==='');if(S.pvIssues&&!miss)return '';if(miss)nIss++;return `<tr ${miss?'style="background:var(--bad)"':''}><td class="n">1.${i+1}</td><td colspan="2">${lb}${miss?' <b style="color:var(--badInk)">– חובה, חסר</b>':''}</td><td colspan="8">${k==='desc'?`<textarea data-pf="desc" style="min-height:40px;background:#fff">${esc(P.desc||'')}</textarea>`:inp(k,t,'max-width:420px')}</td></tr>`}).join('')}
+   ${un.length?(nIss+=0,`<tr class="sec" style="background:var(--badInk)"><td colspan="11">לא משויך – ${un.length} שורות: בחרו לכל אחת פרק (הן לא ייכללו באקסל עד אז)</td></tr>`+un.map((r,i)=>line({sup:r.sup,svc:r.svc,date:r.date,excl:+r.excl||0,incl:+r.incl||0,note:r.note||'',ids:[r.id]},'?',i,'','')).join('')):''}
+   ${SEC.map(([k,no,title,flab])=>`<tr class="sec"><td colspan="11">${no}. ${title}</td></tr>${L[k].length?L[k].map((l,i)=>line(l,no,i,k,flab)).join(''):'<tr><td></td><td colspan="10" class="muted small">אין שורות בפרק</td></tr>'}${totRow('סה"כ '+title,S2[k])}`).join('')}
    ${totRow('סה"כ תקורות (תכנון, ניהול, פיקוח, אגרות, היטלים ועמלה)',ov)}${totRow('סה"כ עלות הפרויקט (PRICE)',tot,1)}
    ${reconRows}
-   <tr class="sec"><td colspan="10">8. עלות מ"ר בניה <span style="font-weight:400;opacity:.8;font-size:13px">· עמודות: PRICE ללא/כולל מע"מ · COST ללא/כולל מע"מ</span></td></tr>
-   ${sq.map(([t,v],i)=>`<tr><td class="n">8.${i+1}</td><td colspan="3">${t}</td>${[0,1,2,3].map(j=>`<td class="n">${v[j]==null?'':v[j]}</td>`).join('')}<td></td><td></td></tr>`).join('')}
+   <tr class="sec"><td colspan="11">8. עלות מ"ר בניה <span style="font-weight:400;opacity:.8;font-size:13px">· עמודות: PRICE ללא/כולל מע"מ · COST ללא/כולל מע"מ</span></td></tr>
+   ${sq.map(([t,v],i)=>`<tr><td class="n">8.${i+1}</td><td colspan="4">${t}</td>${[0,1,2,3].map(j=>`<td class="n">${v[j]==null?'':v[j]}</td>`).join('')}<td></td><td></td></tr>`).join('')}
    </tbody></table></div>`;
   const drawer=S.scanOpen&&S.pages.length?`<div class="drawer"><div class="bar2"><b>סריקת הדוח</b>${S.pages.map((p,i)=>`<button class="sm ${S.pageSel===i?'pri':''}" data-vp="${i}">${p.n}</button>`).join('')}<span style="flex:1"></span><button class="sm" data-z="-1">−</button><button class="sm" data-z="1">+</button><button class="sm" id="scanX">✕ סגירה</button></div>
    <div class="img"><img src="${S.pages[S.pageSel]?S.pages[S.pageSel].url:''}" alt="עמוד מהדוח" style="width:${S.zoom*100}%"></div></div>`:'';
@@ -949,7 +955,7 @@ function bindSheet(){
   document.querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{S.zoom=Math.max(.5,Math.min(3,S.zoom+(+b.dataset.z)*.25));render()});
   document.querySelectorAll('[data-scan]').forEach(b=>b.onclick=()=>{const i=S.pages.findIndex(p=>p.n==b.dataset.scan);if(i>=0){S.pageSel=i;S.scanOpen=true;render()}});
   const as=$('#accSug');if(as)as.onclick=()=>{const seen=new Set();S.P.rows.forEach(r=>{if(r.cat&&r.cat!=='skip'&&(r.catSrc==='rule'||r.catSrc==='ai')){r.catSrc='user';const k=gkey(r);if(!seen.has(k)){seen.add(k);rememberSupplier(r,r.cat)}}});S.pvOk=false;touch();render()};
-  $('#addRow').onclick=()=>{S.P.rows.push({id:uid(),sup:'',svc:'',date:'',excl:null,incl:null,rate:null,calc:'',page:null,note:'',ok:false,src:'manual',cat:''});S.expGrouped=false;S.pvIssues=false;touch();render();const t=document.querySelector('#pv tbody tr[data-ids] [data-lf=sup]');if(t){t.scrollIntoView({block:'center'});t.focus()}};
+  $('#addRow').onclick=()=>{S.P.rows.push({id:uid(),ord:S.P.rows.reduce((m,r)=>Math.max(m,r.ord||0),0)+1,sup:'',svc:'',date:'',excl:null,incl:null,rate:null,calc:'',page:null,note:'',ok:false,src:'manual',cat:''});S.expGrouped=false;S.pvIssues=false;touch();render();const t=document.querySelector('#pv tbody tr[data-ids] [data-lf=sup]');if(t){t.scrollIntoView({block:'center'});t.focus()}};
   document.querySelectorAll('#pv [data-okline]').forEach(b=>b.onclick=()=>{const ids=b.closest('tr').dataset.ids.split(',');const rs=S.P.rows.filter(r=>ids.includes(r.id));rs.forEach(r=>{r.ok=true;r.flag=false;r.vatOk=true;r.dupOk=true;if(r.catSrc==='rule'||r.catSrc==='ai')r.catSrc='user'});if(rs[0]&&rs[0].cat&&rs[0].cat!=='skip')rememberSupplier(rs[0],rs[0].cat);S.pvOk=false;touch();rr()});
   document.querySelectorAll('#pv [data-delline]').forEach(b=>b.onclick=()=>{const id=b.closest('tr').dataset.ids;const i=S.P.rows.findIndex(r=>r.id===id);if(i<0)return;const r=S.P.rows.splice(i,1)[0];S.pvOk=false;touch();rr();toast('השורה נמחקה',[['ביטול',()=>{S.P.rows.splice(i,0,r);touch();render()}]])});
   document.querySelectorAll('#pv [data-pf]').forEach(i=>i.onchange=()=>{const k=i.dataset.pf;let v=i.value.trim();if(/area|index|devArea|devCost|bnm|report/.test(k))v=num(v);S.P[k]=v;if(S.P.src&&!/devArea|devCost|bnm|report/.test(k))S.P.src[k]=v===''||v==null?'':'manual';S.pvOk=false;touch();rr()});
