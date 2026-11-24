@@ -12,104 +12,172 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
 <style>
 /*
-VOICE: clerical, calm, exact — a ledger desk, not a dashboard.
-IDEA: a municipal cost-analysis form: scan on one side, the clean ledger on the other.
-PICTURE: the working table itself, with the scanned page beside it.
-COLOUR and TYPE: black on white, one mint field (#b8f5d0) for "done/confirmed", amber for "needs you". Rubik headings, Assistant body.
-LAYOUT: top bar + step tabs; each step one full-width working surface; review step splits scan | table.
+VOICE: municipal engineering office – calm, exact, confident.
+IDEA: a cost-control desk: a deep sea-blue rail, white ledgers, mint for "approved", amber for "needs a look".
+PICTURE: dashboard hero with an original skyline of public buildings; the working sheet itself on the project pages.
+COLOUR/TYPE: sea blue #0B3954 + teal #0A7E8C, mint #B8F5D0 for done, amber for review, red for missing. Rubik headings, Assistant text.
+LAYOUT: right sidebar navigation, content cards, stepper for the three steps.
 */
-:root{color-scheme:light dark;
---bg:light-dark(#ffffff,#0f1112);--ink:light-dark(#111416,#eef1f2);--mute:light-dark(#5b6670,#9aa6ae);
---line:light-dark(#dfe3e6,#2a2f33);--soft:light-dark(#f4f6f7,#171a1c);--mint:light-dark(#b8f5d0,#1f4a33);--mintInk:light-dark(#0b4d2b,#b8f5d0);
---warn:light-dark(#fff1cc,#4a3a0c);--warnInk:light-dark(#6b4b00,#ffd970);--bad:light-dark(#ffd9d6,#4d1a16);--badInk:light-dark(#8a1a10,#ffb4ab);--acc:light-dark(#111416,#eef1f2)}
-:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+:root{color-scheme:light;--bg:#F3F6F8;--card:#FFFFFF;--ink:#122230;--mute:#5E6E7B;--line:#E1E7EC;--soft:#F5F8FA;
+--brand:#0B3954;--brand2:#0A7E8C;--brandSoft:#E6F2F4;--mint:#D3F7E2;--mintInk:#0B5A33;--warn:#FFF3D1;--warnInk:#7A5300;--bad:#FFE0DC;--badInk:#93261A;--acc:#0B3954;
+--sh:0 1px 2px rgba(16,40,60,.06),0 6px 22px rgba(16,40,60,.06)}
 *{box-sizing:border-box;min-width:0}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Assistant,Arial,sans-serif;overflow-x:clip}
-h1,h2,h3{font-family:Rubik,Assistant,sans-serif;margin:0;line-height:1.1}
-h1{font-size:22px}h2{font-size:26px;margin-bottom:6px}h3{font-size:17px}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Assistant,Arial,sans-serif}
+h1,h2,h3{font-family:Rubik,Assistant,sans-serif;margin:0;line-height:1.15;color:var(--ink)}
+h1{font-size:30px}h2{font-size:26px}h3{font-size:18px}
 button,input,select,textarea{font:inherit;color:inherit}
-button{cursor:pointer;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 14px;min-height:40px}
-button:hover{border-color:var(--ink)}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
-button.pri{background:var(--acc);color:var(--bg);border-color:var(--acc);font-weight:700}
+button{cursor:pointer;border:1px solid var(--line);background:var(--card);border-radius:10px;padding:8px 16px;min-height:40px;transition:border-color .15s,background .15s}
+button:hover{border-color:var(--brand2)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--brand2);outline-offset:1px}
+button.pri{background:var(--brand);color:#fff;border-color:var(--brand);font-weight:700}
+button.pri:hover{background:#0d4a6c}
 button.ghost{border-color:transparent;background:transparent}
-button.sm{min-height:32px;padding:4px 10px;font-size:14px}
+button.sm{min-height:32px;padding:4px 12px;font-size:14px;border-radius:8px}
 button:disabled{opacity:.45;cursor:not-allowed}
-input,select,textarea{border:1px solid var(--line);border-radius:6px;padding:7px 9px;background:var(--bg);font-size:16px;width:100%}
+input,select,textarea{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;font-size:16px;width:100%}
 textarea{min-height:64px;resize:vertical}
-.top{display:flex;align-items:center;gap:14px;padding:12px max(3vw,14px);border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:5;flex-wrap:wrap}
-.top .sp{flex:1}.save{font-size:14px;color:var(--mute)}
-.wrap{padding:20px max(3vw,14px) 60px;max-width:1500px;margin:0 auto}
-.muted{color:var(--mute)}.small{font-size:14px}
-.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:14px 0 18px;overflow-x:auto}
-.tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:10px 14px;white-space:nowrap;color:var(--mute)}
-.tabs button.on{border-bottom-color:var(--ink);color:var(--ink);font-weight:700}
-.badge{display:inline-block;min-width:22px;padding:0 7px;border-radius:20px;font-size:13px;font-weight:700;margin-inline-start:6px;background:var(--soft)}
-.badge.w{background:var(--warn);color:var(--warnInk)}.badge.ok{background:var(--mint);color:var(--mintInk)}.badge.b{background:var(--bad);color:var(--badInk)}
+.small{font-size:14px}.muted{color:var(--mute)}
+/* shell */
+.shell{display:grid;grid-template-columns:260px minmax(0,1fr);min-height:100vh}
+.side{background:linear-gradient(180deg,#0B3954 0%,#08283C 100%);color:#DCE9F0;padding:22px 16px;display:flex;flex-direction:column;gap:18px;position:sticky;top:0;height:100vh}
+.brand{display:flex;gap:12px;align-items:center;padding:4px 6px 16px;border-bottom:1px solid rgba(255,255,255,.12)}
+.brand .logo{width:52px;height:52px;border-radius:12px;background:#fff;display:grid;place-items:center;overflow:hidden;flex:none}
+.brand .logo img{max-width:46px;max-height:46px}
+.brand .logo svg{width:34px;height:34px}
+.brand b{display:block;font-family:Rubik,sans-serif;font-size:18px;color:#fff;line-height:1.2}
+.brand span{font-size:13px;color:#A9C4D3}
+.nav{display:flex;flex-direction:column;gap:4px}
+.nav button{background:transparent;border:0;color:#DCE9F0;text-align:start;display:flex;align-items:center;gap:12px;border-radius:10px;padding:10px 12px;font-size:16px}
+.nav button svg{width:20px;height:20px;flex:none;opacity:.85}
+.nav button:hover{background:rgba(255,255,255,.08)}
+.nav button.on{background:#fff;color:var(--brand);font-weight:700}
+.nav .new{background:var(--brand2);color:#fff;font-weight:700;margin-top:6px}
+.nav .new:hover{background:#0c8f9e}
+.side-foot{margin-top:auto;font-size:13px;color:#A9C4D3;display:flex;flex-direction:column;gap:6px;padding:10px 6px;border-top:1px solid rgba(255,255,255,.12)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-inline-end:6px;background:#7BE0A6}
+.dot.off{background:#FFC857}
+main{padding:28px clamp(16px,3vw,40px) 60px;max-width:1560px;width:100%}
+/* cards */
+.card{background:var(--card);border-radius:16px;box-shadow:var(--sh);padding:22px}
+.hero{position:relative;overflow:hidden;border-radius:20px;background:linear-gradient(120deg,#0B3954 0%,#0A7E8C 100%);color:#fff;padding:30px 32px;min-height:190px;display:flex;align-items:flex-end;box-shadow:var(--sh)}
+.hero h1{color:#fff;font-size:32px}.hero p{color:#CFE6EC;margin:8px 0 0;max-width:560px}
+.hero svg.sky{position:absolute;left:0;bottom:0;width:55%;height:100%;opacity:.95;pointer-events:none}
+@media(max-width:900px){.hero svg.sky{width:100%;opacity:.3}}
+.hero .hx{position:relative;z-index:1}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin:20px 0}
+.kpi{background:var(--card);border-radius:16px;box-shadow:var(--sh);padding:18px 20px;display:flex;flex-direction:column;gap:4px;border-top:4px solid var(--brand2)}
+.kpi span{font-size:14px;color:var(--mute)}
+.kpi b{font-family:Rubik,sans-serif;font-size:30px;font-variant-numeric:tabular-nums;line-height:1.1}
+.kpi i{font-style:normal;font-size:13px;color:var(--mute)}
+.kpi.warn{border-top-color:#F0A500}.kpi.ok{border-top-color:#2FBF71}.kpi.navy{border-top-color:var(--brand)}
+.dgrid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:18px}
+.bars{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.bar{display:grid;grid-template-columns:minmax(0,170px) minmax(0,1fr) 90px;gap:10px;align-items:center;font-size:14px}
+.bar .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .track{height:12px;background:var(--soft);border-radius:8px;overflow:hidden}
+.bar .track i{display:block;height:100%;background:linear-gradient(90deg,#0A7E8C,#0B3954);border-radius:8px}
+.bar b{font-variant-numeric:tabular-nums;text-align:left;direction:ltr}
+.stack{display:flex;height:22px;border-radius:10px;overflow:hidden;margin:12px 0}
+.stack i{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:14px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:6px;background:var(--c)}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap}
+.st-new{background:#E8EEF3;color:#3E5566}.st-check{background:var(--warn);color:var(--warnInk)}.st-ready{background:var(--brandSoft);color:var(--brand)}.st-done{background:var(--mint);color:var(--mintInk)}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+.head p{margin:6px 0 0;color:var(--mute)}
+/* stepper */
+.steps{display:flex;gap:0;margin:18px 0 22px;background:var(--card);border-radius:16px;box-shadow:var(--sh);padding:8px}
+.steps button{flex:1;border:0;background:transparent;border-radius:12px;display:flex;align-items:center;gap:12px;padding:12px 16px;text-align:start}
+.steps button .c{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-family:Rubik,sans-serif;font-weight:700;background:var(--soft);color:var(--mute);flex:none}
+.steps button b{display:block;font-size:16px}.steps button span{font-size:13px;color:var(--mute)}
+.steps button.on{background:var(--brandSoft)}.steps button.on .c{background:var(--brand);color:#fff}
+.steps button.done .c{background:#2FBF71;color:#fff}
+/* tables */
 table{border-collapse:collapse;width:100%}
-th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:start;vertical-align:middle}
-th{font-size:13px;color:var(--mute);font-weight:600;background:var(--soft);position:sticky;top:0;z-index:1}
+th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:start;vertical-align:middle}
+th{font-size:13px;color:var(--mute);font-weight:700;background:#F7FAFB;position:sticky;top:0;z-index:1}
 td.n,th.n{text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap;direction:ltr}
-td input,td select{padding:4px 6px;font-size:15px;border-color:transparent;background:transparent}
-td input:hover,td select:hover{border-color:var(--line)}td input:focus,td select:focus{border-color:var(--ink);background:var(--bg)}
+td input,td select{padding:5px 7px;font-size:15px;border-color:transparent;background:transparent}
+td input:hover,td select:hover{border-color:var(--line)}td input:focus,td select:focus{border-color:var(--brand2);background:#fff}
 td input.num{text-align:left;direction:ltr;font-variant-numeric:tabular-nums}
-tr.grp td{background:var(--soft);font-weight:600}
-tr.child td:nth-child(2){padding-inline-start:26px}
-tr.ok td:first-child{box-shadow:inset -4px 0 var(--mint)}
-tr.flag:not(.ok) td{background:var(--warn)}
-.chip{display:inline-block;font-size:12px;padding:1px 8px;border-radius:12px;background:var(--soft);white-space:nowrap}
-.chip.pdf{background:var(--warn);color:var(--warnInk)}.chip.man{background:var(--mint);color:var(--mintInk)}.chip.miss{background:var(--bad);color:var(--badInk)}
-.chip.sug{background:var(--warn);color:var(--warnInk)}.chip.conf{background:var(--mint);color:var(--mintInk)}
-.drop{border:2px dashed var(--line);border-radius:14px;padding:40px 20px;text-align:center;background:var(--soft)}
-.drop.over{border-color:var(--ink)}
-.pages{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-top:16px}
-.pg{border:1px solid var(--line);border-radius:8px;padding:6px;background:var(--bg);font-size:13px}
-.pg img{width:100%;display:block;border-radius:4px;background:#fff}
-.pg div{overflow-wrap:anywhere}.pg.done{border-color:var(--mintInk)}.pg.err{border-color:var(--badInk)}.pg.run{border-color:var(--warnInk)}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr));gap:14px 22px}
-.fld label{display:flex;justify-content:space-between;gap:8px;font-size:14px;color:var(--mute);margin-bottom:4px}
-.split{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:16px;align-items:start}.split.nov{grid-template-columns:minmax(0,1fr)}
-.rt{min-width:1040px}.rt td:nth-child(2){min-width:210px}.rt td:nth-child(3){min-width:150px}.rt td:nth-child(4),.rt td:nth-child(5){min-width:118px}.rt td:nth-child(7){min-width:150px}.rt td:nth-child(9){min-width:120px}
-.viewer{position:sticky;top:70px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--soft)}
-.viewer .bar{display:flex;gap:6px;align-items:center;padding:6px;border-bottom:1px solid var(--line);background:var(--bg);flex-wrap:wrap}
-.viewer .img{height:calc(100vh - 170px);overflow:auto}
-.viewer img{display:block;background:#fff;transform-origin:top right}
-.tblwrap{border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:calc(100vh - 230px)}
-.bar2{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
-.recon{display:flex;gap:18px;flex-wrap:wrap;padding:10px 14px;border-radius:10px;background:var(--soft);margin-bottom:12px;font-size:15px}
-.recon b{font-variant-numeric:tabular-nums}
-.recon.good{background:var(--mint);color:var(--mintInk)}.recon.diff{background:var(--warn);color:var(--warnInk)}
-.q{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;display:grid;gap:10px}
+tr.grp td{background:#F2F6F8;font-weight:700}
+tr.sec td{background:var(--brand);color:#fff;font-family:Rubik,sans-serif;font-weight:600;font-size:15px}
+tr.tot td{background:#EAF3F5;font-weight:700}
+tr.big td{background:var(--mint);font-weight:800}
+.list tbody tr{cursor:pointer}.list tbody tr:hover td{background:#F7FAFB}
+.tblwrap{background:var(--card);border-radius:14px;box-shadow:var(--sh);overflow:auto}
+.rt{min-width:1180px}
+.chip{display:inline-block;font-size:12px;padding:2px 9px;border-radius:12px;background:var(--soft);white-space:nowrap}
+.chip.pdf,.chip.sug{background:var(--warn);color:var(--warnInk)}.chip.man,.chip.conf{background:var(--mint);color:var(--mintInk)}.chip.miss{background:var(--bad);color:var(--badInk)}
+.badge{display:inline-block;min-width:22px;padding:0 8px;border-radius:20px;font-size:13px;font-weight:700;background:var(--soft)}
+.badge.w{background:var(--warn);color:var(--warnInk)}.badge.ok{background:var(--mint);color:var(--mintInk)}.badge.b{background:var(--bad);color:var(--badInk)}
+/* read step */
+.drop{border:2px dashed #C5D3DC;border-radius:18px;padding:36px 20px;text-align:center;background:var(--card)}
+.drop.over{border-color:var(--brand2);background:var(--brandSoft)}
+.drop svg{width:56px;height:56px;color:var(--brand2)}
+.pages{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;margin-top:16px}
+.pg{border:1px solid var(--line);border-radius:12px;padding:8px;background:var(--card);font-size:13px;box-shadow:var(--sh)}
+.pg img{width:100%;display:block;border-radius:6px;background:#fff}
+.pg div{overflow-wrap:anywhere}.pg.done{border-color:#2FBF71}.pg.err{border-color:var(--badInk)}.pg.run{border-color:#F0A500}
+.prog{height:8px;background:var(--line);border-radius:8px;overflow:hidden;margin:12px 0}.prog i{display:block;height:100%;background:var(--brand2);transition:width .3s}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr));gap:16px 22px}
+.fld label{display:flex;justify-content:space-between;gap:8px;font-size:14px;color:var(--mute);margin-bottom:5px}
+.q{background:var(--card);border-radius:14px;box-shadow:var(--sh);padding:16px;margin-bottom:12px;display:grid;gap:10px}
 .q .h{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
-.q .opts{display:flex;gap:6px;flex-wrap:wrap}
-.cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin:12px 0 22px}
-.cat{border-radius:10px;padding:12px;background:var(--soft)}.cat b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
-.list td{cursor:pointer}.list tr:hover td{background:var(--soft)}
-.chk{display:grid;gap:8px;margin:14px 0}
-.chk div{padding:10px 12px;border-radius:8px;background:var(--soft)}
-.chk div.ok{background:var(--mint);color:var(--mintInk)}.chk div.w{background:var(--warn);color:var(--warnInk)}
-.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:20;display:flex;gap:12px;align-items:center;max-width:92vw}
-.toast button{background:transparent;color:var(--bg);border-color:var(--bg);min-height:30px;padding:2px 10px}
-.dlg{position:fixed;inset:0;background:rgba(0,0,0,.4);display:grid;place-items:center;z-index:30;padding:14px}
-.dlg>div{background:var(--bg);border-radius:14px;padding:20px;max-width:560px;width:100%;max-height:90vh;overflow:auto}
+.chk{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin:0 0 16px}
+.chk div{padding:12px 14px;border-radius:12px;background:var(--card);box-shadow:var(--sh);border-inline-start:5px solid #F0A500;font-size:15px}
+.chk div.ok{border-inline-start-color:#2FBF71}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.prog{height:8px;background:var(--soft);border-radius:8px;overflow:hidden;margin:10px 0}.prog i{display:block;height:100%;background:var(--mintInk);transition:width .3s}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}.seg button{border:0;border-radius:0;min-height:34px}.seg button.on{background:var(--ink);color:var(--bg)}
-@media(max-width:1000px){.split{grid-template-columns:1fr}.viewer{position:static}.viewer .img{height:60vh}}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card)}.seg button{border:0;border-radius:0;min-height:36px}.seg button.on{background:var(--brand);color:#fff}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--card);border-radius:14px;box-shadow:var(--sh);padding:10px 14px;margin-bottom:12px;position:sticky;top:0;z-index:4}
+.export{background:linear-gradient(120deg,#0B3954,#0A7E8C);color:#fff;border-radius:16px;padding:20px 22px;margin-top:18px;display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap}
+.export label{display:flex;gap:10px;align-items:center;font-weight:700}
+.export button.pri{background:#fff;color:var(--brand);border-color:#fff}
+.drawer{position:fixed;top:0;left:0;bottom:0;width:min(46vw,720px);background:#fff;box-shadow:0 0 40px rgba(0,0,0,.25);z-index:20;display:flex;flex-direction:column}
+.drawer .bar2{display:flex;gap:6px;align-items:center;padding:10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.drawer .img{flex:1;overflow:auto;background:var(--soft)}
+.drawer img{display:block;background:#fff}
+/* settings */
+.stabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.stabs button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#122230;color:#fff;padding:11px 18px;border-radius:12px;z-index:40;display:flex;gap:12px;align-items:center;max-width:92vw;box-shadow:var(--sh)}
+.toast button{background:transparent;color:#fff;border-color:#fff;min-height:30px;padding:2px 10px}
+.dlg{position:fixed;inset:0;background:rgba(8,30,45,.45);display:grid;place-items:center;z-index:30;padding:14px}
+.dlg>div{background:#fff;border-radius:16px;padding:22px;max-width:620px;width:100%;max-height:90vh;overflow:auto;box-shadow:var(--sh)}
+.empty{text-align:center;padding:40px 20px}.empty svg{width:120px;height:90px}
+@media(max-width:1100px){.dgrid{grid-template-columns:1fr}}
+.tbx{display:contents}.mob,.pcards{display:none}
+.pcard{background:var(--card);border-radius:14px;box-shadow:var(--sh);padding:14px 16px;display:grid;gap:8px;cursor:pointer}
+.pk{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pk span{background:var(--soft);border-radius:10px;padding:8px 10px;font-size:13px;color:var(--mute)}.pk b{display:block;font-size:17px;color:var(--ink);font-variant-numeric:tabular-nums}
+@media(max-width:700px){
+ main{padding:16px 12px 50px}h1{font-size:24px}
+ .list.ptbl{display:none}.pcards{display:grid;gap:12px}
+ .toolbar{position:static}.mob{display:inline-flex}.tbx{display:none}.toolbar.open .tbx{display:flex;flex-wrap:wrap;gap:8px;width:100%}
+ .tblwrap{overflow:visible;background:transparent;box-shadow:none}
+ #pv{min-width:0}#pv thead{display:none}#pv,#pv tbody{display:block}
+ #pv tr{display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;background:var(--card);border-radius:12px;box-shadow:var(--sh);margin-bottom:10px;padding:8px}
+ #pv td{display:block;border:0;padding:4px 6px;grid-column:1/-1;min-width:0!important}
+ #pv td[data-l]::before{content:attr(data-l);display:block;font-size:12px;color:var(--mute);font-weight:600}
+ #pv td.n{grid-column:auto;text-align:start}#pv td.n.c0{grid-column:1/-1}#pv td.e{display:none}
+ #pv td input,#pv td select{border-color:var(--line);background:#fff}
+ #pv tr.sec{display:block;background:var(--brand);padding:10px 12px}#pv tr.sec td{background:transparent;padding:0}
+ #pv tr.tot,#pv tr.big{background:#EAF3F5}#pv tr.big{background:var(--mint)}
+ .export{flex-direction:column;align-items:stretch}.export button.pri{width:100%}
+ .steps button{padding:8px 10px}.head .row{width:100%}
+}
+@media(max-width:900px){.shell{grid-template-columns:1fr}.side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:12px}.brand{border:0;padding:0}.nav{flex-direction:row;flex-wrap:wrap}.side-foot{display:none}.steps{flex-direction:column}.drawer{width:100vw}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
-<div class="top">
-  <h1>בדיקת חשבונות סופיים</h1>
-  <span class="muted small">אגף מבני ציבור</span>
-  <span class="sp"></span>
-  <span class="save" id="saveSt"></span>
-  <span class="small muted" id="who"></span>
-  <button id="btnHome" class="ghost">כל הפרויקטים</button>
-  <button id="btnVat" class="ghost">שיעורי מע"מ</button>
-  <button id="btnOut" class="ghost" hidden>יציאה</button>
+<div class="shell">
+ <aside class="side">
+  <div class="brand"><div class="logo" id="logoBox"></div><div><b>חשבונות סופיים</b><span id="orgLine">אגף מבני ציבור</span></div></div>
+  <nav class="nav" id="nav"></nav>
+  <div class="side-foot"><span id="conn"></span><span id="saveSt"></span></div>
+ </aside>
+ <main><div id="app"></div></main>
 </div>
-<div class="wrap" id="app"><p class="muted">טוען…</p></div>
 <div id="layer"></div>
 
 <!-- ============ הגדרות – למלא אחרי יצירת פרויקט Firebase ============ -->
@@ -177,9 +245,9 @@ function vatFor(iso,rates){let r=rates[0]?rates[0].rate:18;for(const x of [...ra
 function buildLines(P,grouped){
   const L={exec:[],plan:[],mgmt:[],fee:[],levy:[]};
   const rows=(P.rows||[]).filter(r=>r.cat&&r.cat!=='skip'&&L[r.cat]);
-  if(!grouped){rows.forEach(r=>L[r.cat].push({sup:r.sup,svc:r.svc,excl:+r.excl||0,incl:+r.incl||0,note:r.note||'',ids:[r.id]}));return L}
+  if(!grouped){rows.forEach(r=>L[r.cat].push({sup:r.sup,svc:r.svc,date:r.date||'',excl:+r.excl||0,incl:+r.incl||0,note:r.note||'',ids:[r.id]}));return L}
   const m=new Map();
-  rows.forEach(r=>{const k=r.cat+'§'+gkey(r);if(!m.has(k)){const o={sup:r.sup,svc:r.svc,excl:0,incl:0,n:0,notes:[],ids:[]};m.set(k,o);L[r.cat].push(o)}const o=m.get(k);o.excl+=+r.excl||0;o.incl+=+r.incl||0;o.n++;o.ids.push(r.id);if(r.note)o.notes.push(r.note)});
+  rows.forEach(r=>{const k=r.cat+'§'+gkey(r);if(!m.has(k)){const o={sup:r.sup,svc:r.svc,date:'',excl:0,incl:0,n:0,notes:[],ids:[]};m.set(k,o);L[r.cat].push(o)}const o=m.get(k);o.excl+=+r.excl||0;o.incl+=+r.incl||0;o.n++;o.ids.push(r.id);if(r.date&&r.date>o.date)o.date=r.date;if(r.note)o.notes.push(r.note)});
   for(const k in L)L[k].forEach(o=>{o.note=(o.n>1?`מאוחד מ-${o.n} שורות`:'')+(o.notes.length?(o.n>1?'; ':'')+o.notes.join('; '):'')});
   return L;
 }
@@ -187,21 +255,22 @@ function buildWB(ExcelJS,P,opt){
   opt=opt||{};const vat=(opt.vat||18)/100;
   const wb=new ExcelJS.Workbook();wb.creator='בדיקת חשבונות סופיים';
   const ws=wb.addWorksheet('ניתוח עלויות',{views:[{rightToLeft:true,showGridLines:false}],pageSetup:{paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0}});
-  ws.columns=[{width:7},{width:17},{width:9},{width:40},{width:26},{width:20},{width:16},{width:16},{width:13},{width:13},{width:36}];
+  ws.columns=[{width:7},{width:17},{width:9},{width:40},{width:26},{width:20},{width:16},{width:16},{width:13},{width:13},{width:36},{width:12}];
   const FN='David',thin={style:'thin',color:{argb:'FF8C969F'}},box={top:thin,left:thin,bottom:thin,right:thin};
   const fill=c=>({type:'pattern',pattern:'solid',fgColor:{argb:c}});
   const C=(a,v,s)=>{const c=ws.getCell(a);c.value=v;c.font={name:FN,size:12,...(s&&s.font||{})};c.alignment={vertical:'middle',horizontal:(s&&s.h)||'right',wrapText:true,readingOrder:'rtl'};if(s&&s.fill)c.fill=fill(s.fill);if(s&&s.fmt)c.numFmt=s.fmt;if(!(s&&s.nob))c.border=box;return c};
   const NUM='#,##0',PCT='0.00%',HEAD='FFD9E2EA',SEC='FFEEF2F5',TOT='FFFFF2CC',BIG='FFB8F5D0';
   const L=buildLines(P,opt.grouped!==false);
   const upd=new Date(P.updatedAt||Date.now());
-  C('K1','עדכון אחרון: '+fmtDT(upd),{font:{size:10,italic:true},h:'left',nob:true});
-  ws.mergeCells('A3:K3');
+  if(opt.logo&&/^data:image\/(png|jpe?g);base64,/.test(opt.logo)){try{const m=opt.logo.match(/^data:image\/(png|jpe?g);base64,(.*)$/);const id=wb.addImage({base64:m[2],extension:m[1]==='png'?'png':'jpeg'});ws.getRow(1).height=30;ws.getRow(2).height=30;ws.addImage(id,{tl:{col:0,row:0},ext:{width:70,height:70}})}catch(e){}}
+  C('L1','עדכון אחרון: '+fmtDT(upd),{font:{size:10,italic:true},h:'left',nob:true});
+  ws.mergeCells('A3:L3');
   C('A3',`פרויקט מס' ${P.num||'—'} - ${P.name||''} - טבלת חישוב עלויות על בסיס חשבון סופי${P.finalDate?' מתאריך '+fmtD(P.finalDate):''}`,{font:{size:16,bold:true},h:'center',nob:true});
   ws.getRow(3).height=26;
-  const hdr=['מס"ד','פרק','מס"ד שניוני','תאור','תפקיד בפרויקט','שיוך','ערך\\ עלות ללא מע"מ','ערך\\ עלות כולל מע"מ','אחוז מעלות הפרויקט (PRICE)','אחוז מעלות הביצוע (COST)','הערות'];
+  const hdr=['מס"ד','פרק','מס"ד שניוני','תאור','תפקיד בפרויקט','שיוך','ערך\\ עלות ללא מע"מ','ערך\\ עלות כולל מע"מ','אחוז מעלות הפרויקט (PRICE)','אחוז מעלות הביצוע (COST)','הערות','תאריך'];
   hdr.forEach((h,i)=>C(String.fromCharCode(65+i)+'5',h,{font:{bold:true},fill:HEAD,h:'center'}));ws.getRow(5).height=34;
   let r=6;
-  const secTitle=t=>{ws.mergeCells(`A${r}:K${r}`);C(`A${r}`,t,{font:{bold:true,size:13},fill:SEC});r++};
+  const secTitle=t=>{ws.mergeCells(`A${r}:L${r}`);C(`A${r}`,t,{font:{bold:true,size:13},fill:SEC});r++};
   secTitle('נתונים כלליים');
   const gen=[['שם הפרויקט',P.name],['תיאור הפרויקט (תכולה)',P.desc],['שטח בניה עפ"י היתר (מ"ר)',P.area?+P.area:''],['חברה מבצעת',P.company],['מנהל פרויקט הנדסי',P.pm],['תאריך חשבון סופי',P.finalDate],['תאריך מסירה',P.deliveryDate],['מדד תשומות הבנייה עפ"י תאריך החשבון הסופי',P.index?+P.index:'']];
   const g0=r;let areaRow=0;
@@ -218,6 +287,7 @@ function buildWB(ExcelJS,P,opt){
     lines.forEach((l,i)=>{C(`C${r}`,`${no}.${i+1}`,{h:'center'});C(`D${r}`,l.sup||'');C(`E${r}`,l.svc||'');C(`F${r}`,flab);
       C(`G${r}`,Math.round((+l.excl||0)*100)/100,{fmt:NUM,h:'left'});C(`H${r}`,Math.round((+l.incl||0)*100)/100,{fmt:NUM,h:'left'});
       C(`I${r}`,null,{fmt:PCT,h:'left'});C(`J${r}`,null,{fmt:PCT,h:'left'});C(`K${r}`,l.note||'',{font:{size:10}});
+      {const m=String(l.date||'').match(/^(\d{4})-(\d{2})-(\d{2})/);C(`L${r}`,m?new Date(Date.UTC(+m[1],+m[2]-1,+m[3])):'',{fmt:'dd/mm/yyyy',h:'center'})}
       pctCells.push([r,+l.incl||0]);se+=+l.excl||0;si+=+l.incl||0;r++});
     ws.mergeCells(`A${s0}:A${r-1}`);C(`A${s0}`,no,{h:'center'});ws.mergeCells(`B${s0}:B${r-1}`);C(`B${s0}`,title,{h:'center'});
     ws.mergeCells(`A${r}:F${r}`);C(`A${r}`,'סה"כ '+title,{font:{bold:true},fill:TOT});
@@ -274,13 +344,13 @@ function buildWB(ExcelJS,P,opt){
   ws.mergeCells(`A${a0}:A${r-1}`);C(`A${a0}`,8,{h:'center'});ws.mergeCells(`B${a0}:B${r-1}`);C(`B${a0}`,'עלות מ"ר בניה',{h:'center'});
   /* detail sheet */
   const d=wb.addWorksheet('פירוט שורות מהדוח',{views:[{rightToLeft:true,state:'frozen',ySplit:3}]});
-  d.columns=[{width:6},{width:7},{width:36},{width:26},{width:18},{width:15},{width:15},{width:9},{width:11},{width:8},{width:34}];
+  d.columns=[{width:6},{width:7},{width:36},{width:26},{width:18},{width:15},{width:15},{width:9},{width:11},{width:8},{width:34},{width:12}];
   const D=(a,v,s)=>{const c=d.getCell(a);c.value=v;c.font={name:FN,size:11,...(s&&s.font||{})};c.alignment={vertical:'middle',horizontal:(s&&s.h)||'right',wrapText:true};if(s&&s.fill)c.fill=fill(s.fill);if(s&&s.fmt)c.numFmt=s.fmt;c.border=box;return c};
-  d.getCell('K1').value='עדכון אחרון: '+fmtDT(upd);d.getCell('K1').font={name:FN,size:10,italic:true};
+  d.getCell('L1').value='עדכון אחרון: '+fmtDT(upd);d.getCell('L1').font={name:FN,size:10,italic:true};
   d.mergeCells('A1:H1');d.getCell('A1').value=`פירוט שורות כפי שנקלטו מהחשבון הסופי - ${P.name||''}`;d.getCell('A1').font={name:FN,size:14,bold:true};
-  ['#','עמוד','שם ספק','סוג שירות','שיוך','ללא מע"מ','כולל מע"מ','מע"מ %','מחושב','נבדק','הערה'].forEach((h,i)=>D(String.fromCharCode(65+i)+'3',h,{font:{bold:true},fill:HEAD,h:'center'}));
+  ['#','עמוד','שם ספק','סוג שירות','שיוך','ללא מע"מ','כולל מע"מ','מע"מ %','מחושב','נבדק','הערה','תאריך'].forEach((h,i)=>D(String.fromCharCode(65+i)+'3',h,{font:{bold:true},fill:HEAD,h:'center'}));
   let k=4;(P.rows||[]).forEach((x,i)=>{D('A'+k,i+1,{h:'center'});D('B'+k,x.page||'',{h:'center'});D('C'+k,x.sup||'');D('D'+k,x.svc||'');D('E'+k,CATS[x.cat]||'לא משויך',x.cat?{}:{fill:'FFFFD9D6'});
-    D('F'+k,+x.excl||0,{fmt:'#,##0.00',h:'left'});D('G'+k,+x.incl||0,{fmt:'#,##0.00',h:'left'});D('H'+k,x.rate!=null?x.rate+'%':'',{h:'center'});D('I'+k,x.calc==='excl'?'ללא מע"מ':x.calc==='incl'?'כולל מע"מ':'',{h:'center'});D('J'+k,x.ok?'✓':'',{h:'center'});D('K'+k,x.note||'');k++});
+    D('F'+k,+x.excl||0,{fmt:'#,##0.00',h:'left'});D('G'+k,+x.incl||0,{fmt:'#,##0.00',h:'left'});D('H'+k,x.rate!=null?x.rate+'%':'',{h:'center'});D('I'+k,x.calc==='excl'?'ללא מע"מ':x.calc==='incl'?'כולל מע"מ':'',{h:'center'});D('J'+k,x.ok?'✓':'',{h:'center'});D('K'+k,x.note||'');{const m=String(x.date||'').match(/^(\d{4})-(\d{2})-(\d{2})/);D('L'+k,m?new Date(Date.UTC(+m[1],+m[2]-1,+m[3])):'',{fmt:'dd/mm/yyyy',h:'center'})}k++});
   const f1=4,f2=k-1;
   d.mergeCells(`A${k}:E${k}`);D('A'+k,'סה"כ שורות (ללא "לא לכלול")',{font:{bold:true},fill:TOT});
   const incl=(P.rows||[]).filter(x=>x.cat!=='skip');
@@ -387,6 +457,9 @@ const OT = (() => {
       if (inc != null && inc !== ex) roles[inc] = 'incl';
       if (ex == null && inc == null) roles[amtCols.reduce((a, b) => T.cols[a].lo < T.cols[b].lo ? a : b)] = 'incl';   // leftmost amount
     }
+    const DRE = /\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4}/;
+    const dc = T.cols.map((c, k) => k).filter(k => !roles[k]).map(k => ({ k, n: T.rows.filter(r => DRE.test(r.cells[k].t)).length })).sort((a, b) => b.n - a.n)[0];
+    if (dc && dc.n >= Math.max(2, T.rows.length * 0.4) && T.cols[dc.k].heb < 3) roles[dc.k] = 'date';
     const text = T.cols.map((c, k) => k).filter(k => !roles[k] && T.cols[k].heb >= 3 && T.cols[k].numeric < 0.5).sort((a, b) => T.cols[b].lo - T.cols[a].lo);
     if (text[0] != null) roles[text[0]] = 'sup';
     if (text[1] != null) roles[text[1]] = 'svc';
@@ -397,7 +470,14 @@ const OT = (() => {
     const k = r => roles.indexOf(r), ks = roles.map((r, i) => r === 'svc' ? i : -1).filter(i => i >= 0);
     const out = { rows: [], totalIncl: null, totalExcl: null };
     T.rows.forEach(R => {
-      const sup = k('sup') >= 0 ? R.cells[k('sup')].t.replace(/^[\\\/|,.°'"\-_ ]+/, '').trim() : '';
+      const DRE = /(\d{1,2})[\/.](\d{1,2})[\/.](\d{2,4})/;
+      let sup = k('sup') >= 0 ? R.cells[k('sup')].t : '';
+      let date = k('date') >= 0 ? R.cells[k('date')].t : '';
+      let dm = (date.match(DRE) || sup.match(DRE));
+      sup = sup.replace(new RegExp(DRE.source, 'g'), ' ');
+      // leading row numbers / garbled dates / stray marks that stuck to the supplier name
+      sup = sup.replace(/^[\s\d|\/.\[\],;:°'"\-_]+(?=[א-תA-Za-z])/, '').replace(/^[\\\/|,.°'"\-_ ]+/, '').replace(/\s+/g, ' ').trim();
+      const iso = dm ? (() => { let y = +dm[3]; if (y < 100) y += 2000; const d = +dm[1], m = +dm[2]; return d >= 1 && d <= 31 && m >= 1 && m <= 12 ? `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` : ''; })() : '';
       const svc = ks.map(i => R.cells[i].t).filter(Boolean).join(' ').trim();
       let e = k('excl') >= 0 ? toNum(R.cells[k('excl')].t) : null, inc = k('incl') >= 0 ? toNum(R.cells[k('incl')].t) : null;
       const lowC = ['excl', 'incl'].some(r => k(r) >= 0 && R.cells[k(r)].t && R.cells[k(r)].c < 70);
@@ -414,7 +494,7 @@ const OT = (() => {
             if (inc < ci * 0.5 && lead(inc).length >= 3 && String(Math.floor(ci)).startsWith(lead(inc))) { inc = null; note = 'ספרות חסרות בסכום כולל מע"מ – חושב מהסכום ללא מע"מ'; break; }
             if (e < ce * 0.5 && lead(e).length >= 3 && String(Math.floor(ce)).startsWith(lead(e))) { e = null; note = 'ספרות חסרות בסכום ללא מע"מ – חושב מהסכום כולל מע"מ'; break; } } }
       } else ok = true;                                     // one amount only: nothing to cross-check
-      out.rows.push({ sup: sup || svc, svc: sup ? svc : '', excl: e, incl: inc, ok: ok && !lowC, note });
+      out.rows.push({ sup: sup || svc, svc: sup ? svc : '', date: iso, excl: e, incl: inc, ok: ok && !lowC, note });
     });
     if (out.rows.length > 2) {                              // last row equal to the sum above it = the table's total
       const last = out.rows[out.rows.length - 1], v = x => x.incl != null ? x.incl : x.excl;
@@ -441,7 +521,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const hash=s=>{let h=2166136261;for(const c of String(s)){h^=c.codePointAt(0);h=Math.imul(h,16777619)>>>0}return 'k'+h.toString(36)};
 const DEFAULT_VAT=[{from:'2012-09-01',rate:17},{from:'2013-06-02',rate:18},{from:'2015-10-01',rate:17},{from:'2025-01-01',rate:18}];
 const FIELDS=[['num','מס\' פרויקט',0],['name','שם הפרויקט',1],['desc','תיאור הפרויקט (תכולה)',1,'ta'],['area','שטח בניה עפ"י היתר (מ"ר)',1,'num'],['devArea','שטח פיתוח (מ"ר)',0,'num'],['company','חברה מבצעת',1],['pm','מנהל פרויקט הנדסי',0],['finalDate','תאריך חשבון סופי',1,'date'],['deliveryDate','תאריך מסירה',1,'date'],['index','מדד תשומות הבנייה בתאריך החשבון',0,'num'],['devCost','עלות פיתוח למ"ר (הנחת עבודה)',0,'num'],['bnm','ב.נ.מ. לניכוי (%)',0,'num']];
-const S={view:'list',projects:[],P:null,sup:{},vat:DEFAULT_VAT,pages:[],tab:'read',grouped:true,open:{},db:null,sample:null,dl:null,q:'',zoom:1,pageSel:0,reading:false,undo:null,expGrouped:true};
+const S={view:'list',projects:[],P:null,sup:{},vat:DEFAULT_VAT,pages:[],tab:'read',grouped:true,open:{},db:null,sample:null,dl:null,q:'',zoom:1,pageSel:0,reading:false,undo:null,expGrouped:false,gen:{},tpl:[]};
 let saveT=null,saving=false,dirty=false;
 
 /* ---------- storage ---------- */
@@ -453,8 +533,9 @@ async function loadAll(){
     catch(e){S.dbErr=e.code==='timeout'?'אין חיבור למסד הנתונים. ודאו שחוקי Realtime Database מאפשרים קריאה וכתיבה.':'לא ניתן לטעון פרויקטים: '+(e.message||e.code);toast(S.dbErr);return}
     try{const q=await S.db.collection('suppliers').limit(1000).get();S.sup={};q.docs.forEach(d=>{S.sup[d.id]=d.data()})}catch(e){}
     try{const q=await S.db.collection('templates').limit(500).get();S.tpl=q.docs.map(d=>d.data())}catch(e){}
+    try{const g=await S.db.doc('settings/general').get();if(g.exists)S.gen=g.data()||{}}catch(e){}
     try{const v=await S.db.doc('settings/vat').get();if(v.exists&&Array.isArray(v.data().rates))S.vat=v.data().rates}catch(e){}
-  }else{S.projects=LS.get('projects')||[];S.sup=LS.get('sup')||{};S.vat=LS.get('vat')||DEFAULT_VAT;S.tpl=LS.get('tpl')||[]}
+  }else{S.projects=LS.get('projects')||[];S.sup=LS.get('sup')||{};S.vat=LS.get('vat')||DEFAULT_VAT;S.tpl=LS.get('tpl')||[];S.gen=LS.get('gen')||{}}
 }
 function touch(){if(!S.P)return;S.P.updatedAt=Date.now();dirty=true;$('#saveSt').textContent='שינויים לא שמורים…';clearTimeout(saveT);saveT=setTimeout(save,1200)}
 async function save(){
@@ -509,7 +590,7 @@ function fixVat(r){
   else{if(r.excl==null){r.incl=null;r.calc='';return}r.incl=rd(r.excl*(1+rate/100))}
 }
 function implied(r){if(!r.excl||!r.incl)return null;return (r.incl/r.excl-1)*100}
-function vatFlag(r){const i=implied(r);if(i==null||r.calc)return '';const known=[...new Set(S.vat.map(x=>x.rate))];return known.some(k=>Math.abs(i-k)<0.15)?'':'⚠'}
+function vatFlag(r){const i=implied(r);if(i==null||r.calc||r.vatOk)return '';const known=[...new Set(S.vat.map(x=>x.rate))];return known.some(k=>Math.abs(i-k)<0.15)?'':'⚠'}
 
 /* ---------- PDF ---------- */
 async function loadPdf(file){
@@ -579,19 +660,19 @@ function importTabs(){
   const P=S.P,rates=[...new Set([projVat(),...S.vat.map(x=>x.rate)])];let added=0,flagged=0;
   (S.tabs||[]).forEach(tb=>{
     const o=OT.apply(tb.T,tb.roles,rates);
-    o.rows.forEach(x=>{const r={id:uid(),sup:x.sup,svc:x.svc,excl:x.excl,incl:x.incl,rate:null,calc:'',page:tb.page,note:x.note||'',ok:false,flag:!x.ok,src:'ocr'};
+    o.rows.forEach(x=>{const r={id:uid(),sup:x.sup,svc:x.svc,date:x.date||'',excl:x.excl,incl:x.incl,rate:null,calc:'',page:tb.page,note:x.note||'',ok:false,flag:!x.ok,src:'ocr'};
       if(r.excl==null&&r.incl!=null)r.calc='excl';fixVat(r);const s=suggest(r);r.cat=s.cat;r.catSrc=s.src;P.rows.push(r);added++;if(r.flag)flagged++});
     if(o.totalIncl&&!P.reportIncl)P.reportIncl=o.totalIncl;if(o.totalExcl&&!P.reportExcl)P.reportExcl=o.totalExcl;
     saveTemplate(tb.T,tb.roles);
   });
   {const k=S.pages.findIndex(p=>p.n===(S.tabs[0]||{}).page);if(k>=0)S.pageSel=k}
-  S.tabs=[];touch();S.tab='rows';render();
+  S.tabs=[];touch();S.tab='sheet';render();
   toast(`נקלטו ${added} שורות${flagged?`, ${flagged} מסומנות לבדיקה`:''}.`);
 }
-const ROLES=[['','להתעלם'],['sup','שם ספק'],['svc','תיאור / סוג שירות'],['incl','סכום כולל מע"מ'],['excl','סכום ללא מע"מ']];
+const ROLES=[['','להתעלם'],['sup','שם ספק'],['svc','תיאור / סוג שירות'],['date','תאריך'],['incl','סכום כולל מע"מ'],['excl','סכום ללא מע"מ']];
 function mapView(){
   if(!S.tabs||!S.tabs.length)return'';
-  const col={sup:'#dbeafe',svc:'#ede9fe',incl:'var(--mint)',excl:'#fde68a'};
+  const col={sup:'#dbeafe',svc:'#ede9fe',date:'#fce7f3',incl:'var(--mint)',excl:'#fde68a'};
   return `<div style="margin-top:22px"><h3>סימון עמודות</h3>
   <p class="muted small" style="margin:6px 0 12px">המערכת חילקה את הטבלה לעמודות. בחרו מה כל עמודה – מספיק שם ספק וסכום אחד לפחות. הסימון נשמר, ובדוח הבא באותו פורמט הוא יוחל אוטומטית.</p>
   ${S.tabs.map((tb,ti)=>{const T=tb.T;const ok=tb.roles.includes('sup')&&(tb.roles.includes('incl')||tb.roles.includes('excl'));
@@ -604,67 +685,141 @@ function mapView(){
 }
 
 /* ---------- views ---------- */
-function newProject(){S.P={id:uid(),createdAt:Date.now(),updatedAt:Date.now(),src:{},rows:[],devCost:900,bnm:15};S.pages=[];S.tab='read';S.view='edit';S.open={};render()}
-function openProject(id){const p=S.projects.find(x=>x.id===id);if(!p)return;S.P=JSON.parse(JSON.stringify(p));S.P.src=S.P.src||{};S.P.rows=S.P.rows||[];S.pages=[];classifyAll(true);S.tab=S.P.rows.length?'rows':'read';S.view='edit';S.open={};render()}
-
-function stats(){
-  const P=S.P,rows=P.rows||[];
+const IC={
+ dash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/></svg>',
+ list:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 12h18M3 17h12"/></svg>',
+ plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>',
+ gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+ bld:'<svg viewBox="0 0 24 24" fill="none" stroke="#0B3954" stroke-width="1.8"><path d="M3 21h18M5 21V8l7-4 7 4v13M9 21v-5h6v5M8 10h2M14 10h2M8 13h2M14 13h2"/></svg>',
+ up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>'
+};
+const SKY=`<svg class="sky" viewBox="0 0 600 200" preserveAspectRatio="xMinYMax slice" aria-hidden="true">
+ <defs><pattern id="w" width="14" height="16" patternUnits="userSpaceOnUse"><rect x="3" y="4" width="6" height="7" rx="1" fill="#fff" opacity=".35"/></pattern>
+ <linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity=".06"/></linearGradient></defs>
+ <g fill="url(#g)"><rect x="20" y="70" width="70" height="130" rx="4"/><rect x="100" y="110" width="110" height="90" rx="4"/><path d="M100 110l55-34 55 34z"/><rect x="225" y="40" width="60" height="160" rx="4"/><rect x="300" y="95" width="130" height="105" rx="4"/><rect x="445" y="60" width="54" height="140" rx="4"/><rect x="512" y="120" width="80" height="80" rx="4"/><path d="M512 120a40 26 0 0 1 80 0z"/></g>
+ <g fill="url(#w)"><rect x="26" y="78" width="58" height="116"/><rect x="108" y="122" width="94" height="70"/><rect x="231" y="48" width="48" height="146"/><rect x="306" y="104" width="118" height="90"/><rect x="451" y="68" width="42" height="126"/><rect x="518" y="130" width="68" height="64"/></g>
+ <path d="M155 76v-26" stroke="#fff" stroke-opacity=".5" stroke-width="2"/><path d="M155 50l18 6-18 6z" fill="#B8F5D0" fill-opacity=".8"/>
+ <path d="M370 95V20h4v75M372 22h70v4h-70zM436 26v18" stroke="#fff" stroke-opacity=".35" stroke-width="2" fill="none"/>
+ <rect x="0" y="196" width="600" height="4" fill="#fff" opacity=".25"/></svg>`;
+const CATCOL={exec:'#0B3954',plan:'#0A7E8C',mgmt:'#5AB1BB',fee:'#F0A500',levy:'#C2D6DE'};
+function newProject(){S.P={id:uid(),createdAt:Date.now(),updatedAt:Date.now(),src:{},rows:[],devCost:+S.gen.devCost||900,bnm:+S.gen.bnm||15,company:S.gen.company||''};S.pages=[];S.pdfDoc=null;S.tabs=[];S.tab='read';S.view='edit';S.pvOk=false;render()}
+function openProject(id){const p=S.projects.find(x=>x.id===id);if(!p)return;S.P=JSON.parse(JSON.stringify(p));S.P.src=S.P.src||{};S.P.rows=S.P.rows||[];S.pages=[];S.pdfDoc=null;S.tabs=[];classifyAll(true);S.tab=S.P.rows.length?'sheet':'read';S.view='edit';S.pvOk=false;render()}
+function stats(P=S.P){
+  const rows=P.rows||[];
   const missing=FIELDS.filter(f=>f[2]&&(P[f[0]]==null||P[f[0]]==='')).length;
   const unassigned=rows.filter(r=>!r.cat).length;
-  const sug=rows.filter(r=>r.cat&&(r.catSrc==='rule'||r.catSrc==='ai')).length;
+  const sug=rows.filter(r=>r.cat&&r.cat!=='skip'&&(r.catSrc==='rule'||r.catSrc==='ai')).length;
   const unchecked=rows.filter(r=>!r.ok&&r.cat!=='skip').length,skip=rows.filter(r=>r.cat==='skip').length,flag=rows.filter(r=>r.flag&&!r.ok&&r.cat!=='skip').length;
-  const inc=rows.filter(r=>r.cat!=='skip');
+  const inc=rows.filter(r=>r.cat&&r.cat!=='skip');
   const sI=inc.reduce((s,r)=>s+(+r.incl||0),0),sE=inc.reduce((s,r)=>s+(+r.excl||0),0);
   const dI=P.reportIncl?sI-P.reportIncl:null,dE=P.reportExcl?sE-P.reportExcl:null;
-  return {missing,unassigned,sug,unchecked,skip,flag,sI,sE,dI,dE,n:rows.length};
+  const byCat={};inc.forEach(r=>byCat[r.cat]=(byCat[r.cat]||0)+(+r.incl||0));
+  const recon=(dI!=null&&Math.abs(dI)>=1)||(dE!=null&&Math.abs(dE)>=1);
+  return {missing,unassigned,sug,unchecked,skip,flag,sI,sE,dI,dE,n:rows.length,byCat,issues:missing+unassigned+flag+(recon?1:0)};
+}
+function projStatus(p){const st=stats(p);if(!st.n)return ['new','בקליטה'];if(st.issues)return ['check',`בבדיקה · ${st.issues}`];if(p.exportedAt&&p.exportedAt>=p.updatedAt-2000)return ['done','הופק'];return ['ready','מוכן להפקה']}
+const pill=p=>{const [c,t]=projStatus(p);return `<span class="pill st-${c}">${esc(t)}</span>`};
+function navRender(){
+  const v=S.view==='edit'?'projects':S.view;
+  $('#nav').innerHTML=[['dash','דשבורד',IC.dash],['projects','פרויקטים',IC.list],['settings','הגדרות וגיבוי',IC.gear]].map(([k,l,i])=>`<button data-nav="${k}" class="${v===k?'on':''}">${i}${l}</button>`).join('')+`<button class="new" data-nav="new">${IC.plus}חשבון סופי חדש</button>`;
+  document.querySelectorAll('[data-nav]').forEach(b=>b.onclick=async()=>{if(dirty)await save();const k=b.dataset.nav;if(k==='new')return newProject();S.view=k;S.P=null;render()});
+  $('#logoBox').innerHTML=S.gen.logo?`<img src="${esc(S.gen.logo)}" alt="לוגו">`:IC.bld;
+  $('#orgLine').textContent=S.gen.org||'עיריית תל אביב-יפו · אגף מבני ציבור';
+  $('#conn').innerHTML=S.db?'<span class="dot"></span>מחובר למסד הנתונים':'<span class="dot off"></span>מצב מקומי בדפדפן';
 }
 function render(){
-  const app=$('#app');
-  const top=S.view!=='login'&&S.view!=='boot';['#btnHome','#btnVat'].forEach(x=>$(x).hidden=!top);$('#btnOut').hidden=true;
-  if(S.view==='boot'){app.innerHTML='<p class="muted">טוען…</p>';return}
-  if(S.view==='login'){app.innerHTML=loginView();bindLogin();return}
-  if(S.view==='list'){app.innerHTML=listView();bindList();return}
-  const st=stats();
-  const tabs=[['read','1. קריאת הדוח',S.pages.length?`<span class="badge">${S.pages.length} עמ'</span>`:''],
-    ['proj','2. נתוני פרויקט',st.missing?`<span class="badge b">${st.missing}</span>`:'<span class="badge ok">✓</span>'],
-    ['rows','3. שורות ובדיקה',st.n?`<span class="badge ${st.unchecked?'w':'ok'}">${st.n-st.skip-st.unchecked}/${st.n-st.skip}</span>`:''],
-    ['cls','4. סיווג',st.unassigned?`<span class="badge b">${st.unassigned} שאלות</span>`:st.sug?`<span class="badge w">${st.sug} לאישור</span>`:st.n?'<span class="badge ok">✓</span>':''],
-    ['exp','5. תצוגה והפקת אקסל','']];
-  app.innerHTML=`<div class="row" style="justify-content:space-between"><div><h2>${esc(S.P.name||'פרויקט חדש')}</h2><div class="muted small">${S.P.num?'פרויקט מס\' '+esc(S.P.num)+' · ':''}${S.P.pdfName?esc(S.P.pdfName)+' · ':''}עודכן ${fmtDT(new Date(S.P.updatedAt))}</div></div></div>
-  <div class="tabs" role="tablist">${tabs.map(t=>`<button role="tab" data-tab="${t[0]}" class="${S.tab===t[0]?'on':''}">${t[1]}${t[2]}</button>`).join('')}</div>
-  <div id="pane">${({read:readView,proj:projView,rows:rowsView,cls:clsView,exp:expView})[S.tab]()}</div>`;
+  const app=$('#app');navRender();
+  if(S.view==='boot'){app.innerHTML='<div class="card"><p class="muted">טוען…</p></div>';return}
+  if(S.view==='login'){app.innerHTML=loginView();return}
+  if(S.view==='dash'){app.innerHTML=dashView();bindDash();return}
+  if(S.view==='projects'||S.view==='list'){S.view='projects';app.innerHTML=listView();bindList();return}
+  if(S.view==='settings'){app.innerHTML=settingsView();bindSettings();return}
+  const st=stats();const P=S.P;
+  const steps=[['read','קליטת הדוח',S.P.rows.length?`${S.P.rows.length} שורות נקלטו`:'העלאת PDF וזיהוי טבלה',S.P.rows.length>0],
+    ['proj','נתוני הפרויקט',st.missing?`${st.missing} שדות חובה חסרים`:'הנתונים מלאים',!st.missing],
+    ['sheet','גיליון בדיקה והפקה',st.n?(st.issues?`${st.issues} אי התאמות`:'מוכן להפקה'):'אחרי קליטת שורות',st.n&&!st.issues]];
+  app.innerHTML=`<div class="head"><div><div class="row"><h1>${esc(P.name||'חשבון סופי חדש')}</h1>${pill(P)}</div>
+   <p>${P.num?'פרויקט מס\' '+esc(P.num)+' · ':''}${P.company?esc(P.company)+' · ':''}עודכן ${fmtDT(new Date(P.updatedAt))}</p></div>
+   <div class="row"><button class="sm" id="bkOne">גיבוי הפרויקט</button><button class="sm ghost" id="back">→ לרשימת הפרויקטים</button></div></div>
+  <div class="steps" role="tablist">${steps.map((s,i)=>`<button role="tab" data-tab="${s[0]}" class="${S.tab===s[0]?'on':''} ${s[3]?'done':''}"><span class="c">${s[3]&&S.tab!==s[0]?'✓':i+1}</span><span><b>${s[1]}</b><span>${s[2]}</span></span></button>`).join('')}</div>
+  <div id="pane">${({read:readView,proj:projView,sheet:sheetView})[S.tab]()}</div>`;
   app.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;render()});
-  ({read:bindRead,proj:bindProj,rows:bindRows,cls:bindCls,exp:bindExp})[S.tab]();
+  $('#back').onclick=async()=>{if(dirty)await save();S.view='projects';S.P=null;render()};
+  $('#bkOne').onclick=()=>downloadJSON({app:'final-accounts',v:1,at:Date.now(),projects:[S.P]},`גיבוי פרויקט - ${(P.name||'ללא שם').replace(/[\\/:*?"<>|]/g,'')}.json`);
+  ({read:bindRead,proj:bindProj,sheet:bindSheet})[S.tab]();
 }
-function loginView(){return `<div style="max-width:560px;margin:8vh auto" class="drop"><h3>לא ניתן להתחבר למסד הנתונים</h3>
-  <p class="muted">יש להפעיל ב-Firebase: Authentication › Sign-in method › <b>Anonymous</b>.</p><p class="small muted">${esc(S.authErr||'')}</p>
-  <button class="pri" onclick="location.reload()">נסו שוב</button></div>`}
-function bindLogin(){}
+function loginView(){return `<div class="card" style="max-width:560px;margin:8vh auto;text-align:center"><h3>לא ניתן להתחבר למסד הנתונים</h3><p class="small muted">${esc(S.authErr||'')}</p><button class="pri" onclick="location.reload()">נסו שוב</button></div>`}
+/* ----- dashboard ----- */
+function dashView(){
+  const ps=S.projects,all=ps.map(p=>({p,st:stats(p),s:projStatus(p)[0]}));
+  const cnt=k=>all.filter(x=>x.s===k).length;
+  const total=all.reduce((a,x)=>a+x.st.sI,0);
+  const sq=all.filter(x=>+x.p.area>0&&x.st.byCat.exec).map(x=>({p:x.p,v:x.st.byCat.exec/x.p.area})).sort((a,b)=>b.v-a.v);
+  const avg=sq.length?sq.reduce((a,x)=>a+x.v,0)/sq.length:0;
+  const cats={};all.forEach(x=>Object.entries(x.st.byCat).forEach(([k,v])=>cats[k]=(cats[k]||0)+v));const ct=Object.values(cats).reduce((a,b)=>a+b,0);
+  const need=all.filter(x=>x.s==='check').sort((a,b)=>b.p.updatedAt-a.p.updatedAt).slice(0,6);
+  const recent=ps.slice().sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,6);
+  const lastBk=S.gen.lastBackup,bkOld=!lastBk||Date.now()-lastBk>7*864e5;
+  const hr=new Date().getHours(),hi=hr<12?'בוקר טוב':hr<17?'צהריים טובים':'ערב טוב';
+  return `<div class="hero">${SKY}<div class="hx"><p style="margin:0 0 6px;color:#B8F5D0;font-weight:700">${hi}</p><h1>בקרת חשבונות סופיים</h1><p>${esc(S.gen.org||'עיריית תל אביב-יפו · אגף מבני ציבור')} — מעקב אחר כל החשבונות הסופיים, מהקליטה ועד דוח ניתוח העלויות.</p></div></div>
+  ${bkOld&&ps.length?`<div class="chk" style="margin-top:16px"><div>⚠ ${lastBk?'הגיבוי האחרון בוצע לפני יותר משבוע':'עדיין לא בוצע גיבוי'} · <button class="sm" id="goBk">לגיבוי</button></div></div>`:''}
+  <div class="kpis">
+   <div class="kpi navy"><span>חשבונות סופיים</span><b>${ps.length}</b><i>${cnt('done')} הופקו · ${cnt('ready')} מוכנים</i></div>
+   <div class="kpi warn"><span>דורשים בדיקה</span><b>${cnt('check')}</b><i>${cnt('new')} בשלב קליטה</i></div>
+   <div class="kpi"><span>סה"כ עלויות (כולל מע"מ)</span><b>${money0(total/1e6)}<small style="font-size:16px"> מיליון ₪</small></b><i>בכל הפרויקטים</i></div>
+   <div class="kpi ok"><span>עלות ביצוע ממוצעת למ"ר</span><b>${avg?money0(avg):'—'}<small style="font-size:16px">${avg?' ₪':''}</small></b><i>${sq.length} פרויקטים עם שטח מוזן</i></div>
+  </div>
+  <div class="dgrid">
+   <div class="card"><div class="row" style="justify-content:space-between"><h3>עלות ביצוע למ"ר לפי פרויקט</h3><span class="small muted">כולל מע"מ</span></div>
+    ${sq.length?`<div class="bars">${sq.slice(0,10).map(x=>`<div class="bar"><span class="t" title="${esc(x.p.name||'')}">${esc(x.p.name||'ללא שם')}</span><span class="track"><i style="width:${(x.v/sq[0].v*100).toFixed(1)}%"></i></span><b>${money0(x.v)} ₪</b></div>`).join('')}</div>`:'<p class="muted small">יופיע כשיהיו פרויקטים עם שטח בניה ועלויות ביצוע.</p>'}
+    <h3 style="margin-top:22px">התפלגות העלויות לפי פרק</h3>
+    ${ct?`<div class="stack">${Object.keys(CATCOL).filter(k=>cats[k]).map(k=>`<i style="width:${cats[k]/ct*100}%;background:${CATCOL[k]}" title="${CATS[k]}"></i>`).join('')}</div>
+    <div class="legend">${Object.keys(CATCOL).filter(k=>cats[k]).map(k=>`<span style="--c:${CATCOL[k]}">${CATS[k]} · ${(cats[k]/ct*100).toFixed(1)}%</span>`).join('')}</div>`:'<p class="muted small">אין עדיין נתונים.</p>'}
+   </div>
+   <div style="display:flex;flex-direction:column;gap:18px">
+    <div class="card"><h3>דורשים טיפול</h3>${need.length?`<table class="list" style="margin-top:8px"><tbody>${need.map(x=>`<tr data-id="${esc(x.p.id)}"><td><b>${esc(x.p.name||'ללא שם')}</b><div class="small muted">${x.st.flag?x.st.flag+' שורות לבדיקה · ':''}${x.st.unassigned?x.st.unassigned+' לא משויכות · ':''}${x.st.missing?x.st.missing+' שדות חסרים':''}${x.st.dI!=null&&Math.abs(x.st.dI)>=1?' · הפרש מול הדוח':''}</div></td><td>${pill(x.p)}</td></tr>`).join('')}</tbody></table>`:'<p class="muted small" style="margin-top:8px">✓ אין פרויקטים פתוחים לבדיקה.</p>'}</div>
+    <div class="card"><h3>עודכנו לאחרונה</h3>${recent.length?`<table class="list" style="margin-top:8px"><tbody>${recent.map(p=>`<tr data-id="${esc(p.id)}"><td><b>${esc(p.name||'ללא שם')}</b><div class="small muted">${fmtDT(new Date(p.updatedAt))}</div></td><td class="n">${money0(stats(p).sI)} ₪</td></tr>`).join('')}</tbody></table>`:`<div class="empty">${IC.bld}<p class="muted">עדיין אין חשבונות. התחילו ב"חשבון סופי חדש".</p></div>`}</div>
+   </div>
+  </div>`;
+}
+function bindDash(){document.querySelectorAll('tr[data-id]').forEach(tr=>tr.onclick=()=>openProject(tr.dataset.id));const g=$('#goBk');if(g)g.onclick=()=>{S.view='settings';S.stab='backup';render()}}
+/* ----- projects list ----- */
 function listView(){
-  const q=S.q.trim();const ps=S.projects.filter(p=>!q||[p.name,p.num,p.company].join(' ').includes(q));
-  return `<div class="row" style="justify-content:space-between;margin-bottom:14px"><div><h2>פרויקטים</h2><p class="muted" style="margin:0">כל חשבון סופי הוא פרויקט: מעלים את הדוח, בודקים, מסווגים ומפיקים אקסל.</p></div>
-  <button class="pri" id="btnNew">+ חשבון סופי חדש</button></div>
-  ${S.dbErr?`<p class="chip miss" style="margin-bottom:10px">${esc(S.dbErr)}</p>`:''}${!S.db?'<p class="chip pdf" style="margin-bottom:10px">מצב מקומי: לא הוגדר Firebase – הנתונים נשמרים בדפדפן זה בלבד והקריאה האוטומטית כבויה</p>':''}
-  <input id="q" placeholder="חיפוש לפי שם, מספר או חברה" value="${esc(S.q)}" style="max-width:420px;margin-bottom:12px">
-  ${ps.length?`<div class="tblwrap" style="max-height:none"><table class="list"><thead><tr><th>מס'</th><th>שם הפרויקט</th><th>חברה מבצעת</th><th class="n">סה"כ כולל מע"מ</th><th>שורות</th><th>עודכן</th><th></th></tr></thead><tbody>
-  ${ps.map(p=>{const rows=p.rows||[];const t=rows.filter(r=>r.cat!=='skip').reduce((s,r)=>s+(+r.incl||0),0);const un=rows.filter(r=>!r.cat).length;
-   return `<tr data-id="${esc(p.id)}"><td>${esc(p.num||'')}</td><td><b>${esc(p.name||'ללא שם')}</b></td><td>${esc(p.company||'')}</td><td class="n">${money0(t)}</td><td>${rows.length}${un?` <span class="chip miss">${un} לא משויכות</span>`:''}</td><td class="small muted">${fmtDT(new Date(p.updatedAt))}</td><td><button class="sm ghost" data-del="${esc(p.id)}" aria-label="מחיקה">מחיקה</button></td></tr>`}).join('')}
-  </tbody></table></div>`:`<div class="drop"><h3>עדיין אין פרויקטים</h3><p class="muted">לחצו "חשבון סופי חדש" והעלו את ה-PDF הסרוק.</p></div>`}`;
+  const q=S.q.trim(),f=S.fst||'';const ps=S.projects.filter(p=>(!q||[p.name,p.num,p.company].join(' ').includes(q))&&(!f||projStatus(p)[0]===f)).sort((a,b)=>b.updatedAt-a.updatedAt);
+  return `<div class="head"><div><h1>פרויקטים</h1><p>כל חשבון סופי הוא פרויקט: קליטה, נתונים, בדיקה בגיליון והפקה.</p></div><div class="row"><button id="xlList">ייצוא הרשימה לאקסל</button><button class="pri" id="btnNew">+ חשבון סופי חדש</button></div></div>
+  ${S.dbErr?`<p class="chip miss" style="margin-bottom:10px">${esc(S.dbErr)}</p>`:''}
+  <div class="toolbar"><input id="q" placeholder="חיפוש לפי שם, מספר או חברה" value="${esc(S.q)}" style="max-width:360px">
+   <span class="seg">${[['','הכל'],['new','בקליטה'],['check','בבדיקה'],['ready','מוכן'],['done','הופק']].map(([k,l])=>`<button data-fst="${k}" class="${f===k?'on':''}">${l}</button>`).join('')}</span><span class="small muted">${ps.length} פרויקטים</span></div>
+  ${ps.length?`<div class="tblwrap list ptbl"><table class="list"><thead><tr><th>מס'</th><th>שם הפרויקט</th><th>חברה מבצעת</th><th>סטטוס</th><th class="n">שטח (מ"ר)</th><th class="n">סה"כ כולל מע"מ</th><th class="n">ביצוע למ"ר</th><th>עודכן</th><th></th></tr></thead><tbody>
+  ${ps.map(p=>{const st=stats(p);return `<tr data-id="${esc(p.id)}"><td>${esc(p.num||'')}</td><td><b>${esc(p.name||'ללא שם')}</b></td><td>${esc(p.company||'')}</td><td>${pill(p)}</td><td class="n">${p.area?money0(p.area):''}</td><td class="n">${money0(st.sI)}</td><td class="n">${+p.area&&st.byCat.exec?money0(st.byCat.exec/p.area):''}</td><td class="small muted">${fmtDT(new Date(p.updatedAt))}</td><td><button class="sm ghost" data-del="${esc(p.id)}">מחיקה</button></td></tr>`}).join('')}
+  </tbody></table></div>
+  <div class="pcards">${ps.map(p=>{const st=stats(p);return `<div class="pcard" data-id="${esc(p.id)}"><div class="row" style="justify-content:space-between;align-items:flex-start"><b>${esc(p.name||'ללא שם')}</b>${pill(p)}</div>
+   <div class="small muted">${p.num?'מס\' '+esc(p.num)+' · ':''}${esc(p.company||'')}</div>
+   <div class="pk"><span>סה"כ<b>${money0(st.sI)} ₪</b></span><span>ביצוע למ"ר<b>${+p.area&&st.byCat.exec?money0(st.byCat.exec/p.area)+' ₪':'—'}</b></span></div>
+   <div class="row" style="justify-content:space-between"><span class="small muted">${fmtDT(new Date(p.updatedAt))}</span><button class="sm ghost" data-del="${esc(p.id)}">מחיקה</button></div></div>`}).join('')}</div>`:`<div class="card empty">${IC.bld}<h3>אין פרויקטים להצגה</h3><p class="muted">לחצו "חשבון סופי חדש" והעלו את ה-PDF הסרוק.</p></div>`}`;
 }
 function bindList(){
   $('#btnNew').onclick=newProject;
   const q=$('#q');if(q)q.oninput=()=>{S.q=q.value;const p=q.selectionStart;render();const n=$('#q');n.focus();n.setSelectionRange(p,p)};
-  document.querySelectorAll('tr[data-id]').forEach(tr=>tr.onclick=e=>{if(e.target.closest('[data-del]'))return;openProject(tr.dataset.id)});
+  document.querySelectorAll('[data-fst]').forEach(b=>b.onclick=()=>{S.fst=b.dataset.fst;render()});
+  document.querySelectorAll('tr[data-id],.pcard[data-id]').forEach(tr=>tr.onclick=e=>{if(e.target.closest('[data-del]'))return;openProject(tr.dataset.id)});
   document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const p=S.projects.find(x=>x.id===b.dataset.del);
-    dialog(`<h3>למחוק את "${esc(p.name||'ללא שם')}"?</h3><p class="muted">המחיקה סופית ולא ניתן לשחזר.</p><div class="row"><button class="pri" data-ok>מחיקה</button><button data-x>ביטול</button></div>`,async el=>{
+    dialog(`<h3>למחוק את "${esc(p.name||'ללא שם')}"?</h3><p class="muted">המחיקה סופית. מומלץ להוריד קודם גיבוי.</p><div class="row"><button class="pri" data-ok>מחיקה</button><button data-x>ביטול</button></div>`,el=>{
       el.querySelector('[data-ok]').onclick=async()=>{closeDlg();if(S.db){try{await S.db.doc('projects/'+p.id).delete()}catch(e){toast('המחיקה נכשלה');return}}S.projects=S.projects.filter(x=>x.id!==p.id);if(!S.db)LS.set('projects',S.projects);render()}})});
+  $('#xlList').onclick=async()=>{const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet('פרויקטים',{views:[{rightToLeft:true}]});
+    ws.columns=[{header:"מס' פרויקט",width:12},{header:'שם הפרויקט',width:40},{header:'חברה מבצעת',width:20},{header:'סטטוס',width:14},{header:'שטח (מ"ר)',width:12},{header:'סה"כ כולל מע"מ',width:18},{header:'ביצוע כולל מע"מ',width:18},{header:'ביצוע למ"ר',width:14},{header:'תאריך חשבון סופי',width:16},{header:'עודכן',width:18}];
+    ws.getRow(1).font={bold:true};
+    S.projects.forEach(p=>{const st=stats(p);ws.addRow([p.num||'',p.name||'',p.company||'',projStatus(p)[1],+p.area||null,Math.round(st.sI),Math.round(st.byCat.exec||0),+p.area&&st.byCat.exec?Math.round(st.byCat.exec/p.area):null,fmtD(p.finalDate),fmtDT(new Date(p.updatedAt))])});
+    [6,7,8].forEach(c=>ws.getColumn(c).numFmt='#,##0');
+    await S.dl.save({filename:'רשימת חשבונות סופיים.xlsx',data:new Blob([await wb.xlsx.writeBuffer()])})};
 }
+/* ----- step 1: read ----- */
 function readView(){
   const done=S.pages.filter(p=>p.st==='done').length,use=S.pages.filter(p=>p.use).length;
-  return `<div class="drop" id="drop"><h3>${S.pages.length?'הדוח נטען':'העלאת החשבון הסופי (PDF סרוק)'}</h3>
-   <p class="muted">${S.pages.length?`${S.pages.length} עמודים. סמנו את העמודים עם טבלת הספקים ולחצו "זיהוי טקסט". אחר כך מסמנים מה כל עמודה, וקולטים את השורות.`:'גררו לכאן קובץ PDF או בחרו קובץ. הזיהוי מתבצע בדפדפן, והדוח לא נשלח לשום מקום.'}</p>
+  return `<div class="drop" id="drop">${IC.up}<h3 style="margin-top:8px">${S.pages.length?'הדוח נטען':'העלאת החשבון הסופי (PDF סרוק)'}</h3>
+   <p class="muted">${S.pages.length?`${S.pages.length} עמודים. סמנו את העמודים עם טבלת הספקים ולחצו "זיהוי טקסט". אחר כך מסמנים מה כל עמודה וקולטים את השורות.`:'גררו לכאן קובץ PDF או בחרו קובץ. הזיהוי מתבצע בדפדפן, והדוח לא נשלח לשום מקום.'}</p>
    <label class="row" style="justify-content:center"><input type="file" id="file" accept="application/pdf" style="max-width:330px"></label>
-   ${S.P.pdfName&&!S.pages.length?`<p class="small muted">בפרויקט זה נקרא בעבר הקובץ "${esc(S.P.pdfName)}". כדי לראות אותו לצד הטבלה – העלו אותו שוב (לא תתבצע קריאה חוזרת אלא אם תבקשו).</p>`:''}
+   ${S.P.pdfName&&!S.pages.length?`<p class="small muted">בפרויקט זה נקרא בעבר הקובץ "${esc(S.P.pdfName)}". להצגתו בגיליון הבדיקה – העלו אותו שוב (בלי לזהות מחדש).</p>`:''}
   </div>
   ${S.pages.length?`<div class="row" style="margin-top:14px"><button class="pri" id="btnRead" ${S.reading||!use?'disabled':''}>${S.reading?'מזהה טקסט…':`זיהוי טקסט מהסריקה (${use} עמ')`}</button>
    ${S.ocrMsg?`<span class="muted small">${esc(S.ocrMsg)}</span>`:''}
@@ -673,7 +828,7 @@ function readView(){
    <div class="pages">${S.pages.map(p=>`<div class="pg ${p.st}"><img src="${p.url}" alt="עמוד ${p.n}"><label class="row" style="margin-top:6px;gap:6px"><input type="checkbox" data-use="${p.n}" ${p.use?'checked':''} style="width:auto"> עמוד ${p.n}</label>
    <div class="small muted" data-st="${p.n}">${p.st==='run'?'מזהה…':p.st==='done'?'✓ זוהה':p.st==='err'?'לא זוהה':''}</div>${p.err?`<div class="small ${p.st==='err'?'':'muted'}" ${p.st==='err'?'style="color:var(--badInk)"':''}>${esc(p.err)}</div>`:''}</div>`).join('')}</div>`:''}
   ${mapView()}
-  <p style="margin-top:18px"><button id="btnSkip" class="ghost">הקלדה ידנית בלי זיהוי ←</button></p>`;
+  <div class="row" style="margin-top:18px;justify-content:space-between"><button id="btnSkip" class="ghost">הקלדה ידנית בלי זיהוי ←</button>${S.P.rows.length?'<button class="pri" id="toProj">המשך לנתוני הפרויקט ←</button>':''}</div>`;
 }
 function bindRead(){
   const f=$('#file'),d=$('#drop');
@@ -685,10 +840,12 @@ function bindRead(){
     if(sl.value&&sl.value!=='svc')tb.roles=tb.roles.map(r=>r===sl.value?'':r);tb.roles[k]=sl.value;tb.from='user';render()});
   const bi=$('#btnImport');if(bi)bi.onclick=importTabs;
   $('#btnSkip').onclick=()=>{S.tab='proj';render()};
+  const tp=$('#toProj');if(tp)tp.onclick=()=>{S.tab='proj';render()};
 }
+/* ----- step 2: project data ----- */
 function projView(){
-  const P=S.P,v=projVat();
-  return `<p class="muted" style="margin-top:0">שדות שהמערכת קראה מהדוח מסומנים <span class="chip pdf">נקרא מהדוח – לבדיקה</span>, שדות שהוקלדו <span class="chip man">הוקלד</span>, וחובה שחסרים <span class="chip miss">להשלמה</span>. אפשר לתקן כל שדה.</p>
+  const P=S.P;
+  return `<div class="card"><p class="muted" style="margin-top:0">שדות שהמערכת קראה מהדוח מסומנים <span class="chip pdf">נקרא מהדוח – לבדיקה</span>, שדות שהוקלדו <span class="chip man">הוקלד</span>, וחובה שחסרים <span class="chip miss">להשלמה</span>.</p>
   <div class="grid">${FIELDS.map(([k,l,req,t])=>{const v=P[k]==null?'':P[k];const empty=v==='';const s=P.src[k];
    const chip=empty?(req?'<span class="chip miss">להשלמה</span>':''):s==='pdf'?'<span class="chip pdf">נקרא מהדוח – לבדיקה</span>':'<span class="chip man">הוקלד</span>';
    const inp=t==='ta'?`<textarea data-f="${k}">${esc(v)}</textarea>`:`<input data-f="${k}" ${t==='date'?'type="date"':t==='num'?'inputmode="decimal"':''} value="${esc(v)}">`;
@@ -697,173 +854,175 @@ function projView(){
    <select id="vatO"><option value="">אוטומטי לפי תאריך (${vatFor(P.finalDate,S.vat)}%)</option>${[...new Set(S.vat.map(x=>x.rate))].map(r=>`<option value="${r}" ${+P.vatOverride===r?'selected':''}>${r}%</option>`).join('')}</select></div>
    <div class="fld"><label><span>סה"כ כולל מע"מ לפי הדוח (להשוואה)</span>${P.reportIncl?'<span class="chip pdf">נקרא מהדוח</span>':''}</label><input data-f="reportIncl" inputmode="decimal" value="${esc(P.reportIncl||'')}"></div>
    <div class="fld"><label><span>סה"כ ללא מע"מ לפי הדוח (להשוואה)</span>${P.reportExcl?'<span class="chip pdf">נקרא מהדוח</span>':''}</label><input data-f="reportExcl" inputmode="decimal" value="${esc(P.reportExcl||'')}"></div>
-  </div>
-  <div class="row" style="margin-top:18px">${Object.values(P.src).includes('pdf')?'<button id="confAll">אישור כל השדות שנקראו</button>':''}<button class="pri" id="nx">המשך לשורות ←</button></div>`;
+  </div></div>
+  <div class="row" style="margin-top:18px;justify-content:space-between">${Object.values(P.src).includes('pdf')?'<button id="confAll">אישור כל השדות שנקראו</button>':'<span></span>'}<button class="pri" id="nx">המשך לגיליון הבדיקה ←</button></div>`;
 }
 function bindProj(){
   document.querySelectorAll('[data-f]').forEach(i=>i.onchange=()=>{const k=i.dataset.f;const f=FIELDS.find(x=>x[0]===k);let v=i.value.trim();if((f&&f[3]==='num')||k.startsWith('report'))v=num(v);
     S.P[k]=v;if(!k.startsWith('report'))S.P.src[k]=v===''||v==null?'':'manual';if(k==='finalDate')S.P.rows.forEach(r=>{if(r.calc&&r.rate==null)fixVat(r)});touch();rr()});
   $('#vatO').onchange=e=>{S.P.vatOverride=e.target.value?+e.target.value:null;S.P.rows.forEach(r=>{if(r.calc&&r.rate==null)fixVat(r)});touch();render()};
   const c=$('#confAll');if(c)c.onclick=()=>{for(const k in S.P.src)if(S.P.src[k]==='pdf')S.P.src[k]='manual';touch();render()};
-  $('#nx').onclick=()=>{S.tab='rows';render()};
+  $('#nx').onclick=()=>{S.tab='sheet';render()};
 }
-function groups(){const m=new Map();S.P.rows.forEach(r=>{const k=gkey(r);if(!m.has(k))m.set(k,[]);m.get(k).push(r)});return [...m.entries()]}
-function catSel(val,attr){return `<select ${attr} aria-label="שיוך"><option value="">— לא משויך —</option>${Object.entries(CATS).map(([k,l])=>`<option value="${k}" ${val===k?'selected':''}>${l}</option>`).join('')}${val==='mixed'?'<option value="mixed" selected>מעורב</option>':''}</select>`}
 const fx=v=>v==null||v===''?'':(Number.isInteger(+v)?String(v):(+v).toFixed(2));
-function rowTr(r,child){
-  const flag=vatFlag(r);
-  return `<tr class="${child?'child':''} ${r.ok?'ok':''} ${r.flag?'flag':''}" data-r="${r.id}" ${r.flag&&!r.ok?'title="זוהה בחוסר ודאות – לבדוק מול הסריקה"':''}>
-  <td><input type="checkbox" data-ok ${r.ok?'checked':''} aria-label="נבדק" style="width:auto"></td>
-  <td><input data-k="sup" value="${esc(r.sup)}" aria-label="ספק"></td>
-  <td><input data-k="svc" value="${esc(r.svc)}" aria-label="סוג שירות"></td>
-  <td class="n"><input class="num" data-k="excl" value="${fx(r.excl)}" aria-label="ללא מע&quot;מ" title="${r.calc==='excl'?'חושב מהסכום כולל מע&quot;מ':''}" style="${r.calc==='excl'?'font-style:italic':''}"></td>
-  <td class="n"><input class="num" data-k="incl" value="${fx(r.incl)}" aria-label="כולל מע&quot;מ" style="${r.calc==='incl'?'font-style:italic':''}"></td>
-  <td><select data-k="rate" aria-label="מע&quot;מ" style="width:74px"><option value="">${r.calc?projVat()+'%':(implied(r)!=null?implied(r).toFixed(1)+'%':'—')}</option>${[...new Set(S.vat.map(x=>x.rate))].map(v=>`<option value="${v}" ${r.rate===v?'selected':''}>${v}%</option>`).join('')}</select>${flag?`<span title="שיעור המע&quot;מ בשורה אינו תואם שיעור ידוע – לבדוק">${flag}</span>`:''}</td>
-  <td>${catSel(r.cat,'data-k="cat"')}</td>
-  <td class="small muted" style="text-align:center"><button class="sm ghost" data-pg="${r.page||''}" ${r.page?'':'disabled'}>${r.page||'—'}</button></td>
-  <td><input data-k="note" value="${esc(r.note)}" aria-label="הערה" placeholder="הערה"></td>
-  <td><button class="sm ghost" data-delr aria-label="מחיקת שורה">✕</button></td></tr>`;
-}
-function rowsView(){
-  const st=stats(),P=S.P;const gs=groups();
-  const recon=(P.reportIncl||P.reportExcl)?`<div class="recon ${Math.abs(st.dI||0)<1&&Math.abs(st.dE||0)<1?'good':'diff'}">
-   <span>סה"כ שורות כולל מע"מ: <b>${money(st.sI)}</b></span>${P.reportIncl?`<span>לפי הדוח: <b>${money(P.reportIncl)}</b></span><span>הפרש: <b>${money(st.dI)}</b></span>`:''}
-   ${P.reportExcl?`<span>ללא מע"מ: <b>${money(st.sE)}</b> מול <b>${money(P.reportExcl)}</b> (הפרש <b>${money(st.dE)}</b>)</span>`:''}</div>`
-   :`<div class="recon"><span>סה"כ שורות כולל מע"מ: <b>${money(st.sI)}</b> · ללא מע"מ: <b>${money(st.sE)}</b></span><span class="muted">להשוואה מול הדוח הזינו את הסה"כ בשלב 2</span></div>`;
-  const body=S.grouped&&!S.flagOnly?gs.map(([k,rs])=>{if(rs.length===1)return rowTr(rs[0]);const open=S.open[k];
-    const cats=[...new Set(rs.map(r=>r.cat||''))];const c=cats.length===1?cats[0]:'mixed';const allOk=rs.every(r=>r.ok);
-    return `<tr class="grp" data-g="${esc(k)}"><td><input type="checkbox" data-gok ${allOk?'checked':''} aria-label="נבדק" style="width:auto"></td>
-     <td colspan="2"><button class="sm ghost" data-tg aria-expanded="${!!open}">${open?'▾':'◂'}</button> ${esc(rs[0].sup)} · ${esc(rs[0].svc)} <span class="chip">${rs.length} שורות</span>${rs.some(r=>r.flag&&!r.ok)?' <span class="chip sug">לבדיקה</span>':''}</td>
-     <td class="n">${money(rs.reduce((s,r)=>s+(+r.excl||0),0))}</td><td class="n">${money(rs.reduce((s,r)=>s+(+r.incl||0),0))}</td><td></td>
-     <td>${catSel(c,'data-gcat')}</td><td></td><td></td><td></td></tr>${open?rs.map(r=>rowTr(r,1)).join(''):''}`}).join('')
-   :P.rows.filter(r=>!S.flagOnly||(r.flag&&!r.ok)).map(r=>rowTr(r)).join('');
-  return `${recon}<div class="bar2"><span class="seg"><button data-gr="1" class="${S.grouped?'on':''}">מקובץ לפי ספק</button><button data-gr="0" class="${S.grouped?'':'on'}">כל השורות</button></span>
-   ${S.grouped?'<button class="sm" id="expAll">פתח הכל</button><button class="sm" id="colAll">כווץ הכל</button>':''}
-   <button class="sm" id="addR">+ שורה</button><button class="sm" id="okAll">סמן הכל כנבדק</button>${S.pages.length?`<button class="sm" id="hv">${S.hideV?'הצג דוח':'הסתר דוח'}</button>`:`<span class="small muted">${S.P.pdfName?'להצגת הדוח לצד הטבלה העלו אותו שוב בשלב 1':''}</span>`}
-   <span class="muted small">נבדקו ${st.n-st.skip-st.unchecked} מתוך ${st.n-st.skip}</span>${st.flag?`<button class="sm" id="flagOnly" style="background:var(--warn);color:var(--warnInk)">${S.flagOnly?'הצג הכל':`הצג רק ${st.flag} לבדיקה`}</button>`:''}</div>
-  <div class="split ${S.hideV||!S.pages.length?'nov':''}">${S.hideV||!S.pages.length?'':S.pages.length?`<div class="viewer"><div class="bar"><span class="small">עמוד</span>${S.pages.map((p,i)=>`<button class="sm ${S.pageSel===i?'pri':''}" data-vp="${i}">${p.n}</button>`).join('')}<span style="flex:1"></span><button class="sm" data-z="-1" aria-label="הקטנה">−</button><button class="sm" data-z="1" aria-label="הגדלה">+</button></div>
-   <div class="img"><img src="${S.pages[S.pageSel]?S.pages[S.pageSel].url:''}" alt="עמוד מהדוח" style="width:${S.zoom*100}%"></div></div>`
-   :`<div class="viewer"><div style="padding:20px" class="muted small">${S.P.pdfName?`להצגת הדוח לצד הטבלה העלו שוב את "${esc(S.P.pdfName)}" בשלב 1.`:'לא הועלה דוח. אפשר להזין שורות ידנית.'}</div></div>`}
-  <div class="tblwrap"><table class="rt"><thead><tr><th>✓</th><th>שם ספק</th><th>סוג שירות / תפקיד</th><th class="n">ללא מע"מ</th><th class="n">כולל מע"מ</th><th>מע"מ</th><th>שיוך</th><th>עמ'</th><th>הערה</th><th></th></tr></thead>
-  <tbody>${body||'<tr><td colspan="10" class="muted" style="padding:30px;text-align:center">אין שורות עדיין. קראו את הדוח בשלב 1 או הוסיפו שורה.</td></tr>'}</tbody></table></div></div>
-  <p class="small muted">שורה צהובה = זוהתה בחוסר ודאות, לבדוק מול הסריקה ולסמן ✓. סכום בכתב נטוי = חושב לפי שיעור המע"מ. ⚠ = היחס בין הסכומים לא תואם שיעור מע"מ ידוע.</p>`;
-}
 function rr(){setTimeout(()=>{const a=document.activeElement;let sel=null,pos=null;
-  if(a&&a.matches&&a.matches('input,select,textarea')){const tr=a.closest('tr[data-r]');const k=a.dataset.k||a.dataset.f;
-    if(tr&&k)sel=`tr[data-r="${tr.dataset.r}"] [data-k="${k}"]`;else if(a.dataset.f)sel=`[data-f="${a.dataset.f}"]`;else if(a.dataset.pf)sel=`[data-pf="${a.dataset.pf}"]`;else if(a.dataset.lf){const t2=a.closest('tr[data-ids]');if(t2)sel=`tr[data-ids="${t2.dataset.ids}"] [data-lf="${a.dataset.lf}"]`}try{pos=a.selectionStart}catch(e){}}
-  render();if(sel){const n=document.querySelector(sel);if(n){n.focus();try{if(pos!=null)n.setSelectionRange(pos,pos)}catch(e){}}}},0)}
-function rowById(id){return S.P.rows.find(r=>r.id===id)}
-function bindRows(){
-  document.querySelectorAll('[data-gr]').forEach(b=>b.onclick=()=>{S.grouped=b.dataset.gr==='1';render()});
-  const ea=$('#expAll');if(ea)ea.onclick=()=>{groups().forEach(([k])=>S.open[k]=true);render()};
-  const ca=$('#colAll');if(ca)ca.onclick=()=>{S.open={};render()};
-  $('#addR').onclick=()=>{const r={id:uid(),sup:'',svc:'',excl:null,incl:null,rate:null,calc:'',page:S.pages[S.pageSel]?S.pages[S.pageSel].n:null,note:'',ok:false,src:'manual',cat:''};S.P.rows.push(r);S.grouped=false;touch();render();const tr=document.querySelector(`tr[data-r="${r.id}"] input[data-k=sup]`);if(tr)tr.focus()};
-  const hv=$('#hv');if(hv)hv.onclick=()=>{S.hideV=!S.hideV;render()};
-  const fo=$('#flagOnly');if(fo)fo.onclick=()=>{S.flagOnly=!S.flagOnly;render()};
-  $('#okAll').onclick=()=>{S.P.rows.forEach(r=>r.ok=true);touch();render()};
-  document.querySelectorAll('[data-vp]').forEach(b=>b.onclick=()=>{S.pageSel=+b.dataset.vp;render()});
-  document.querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{S.zoom=Math.max(.5,Math.min(3,S.zoom+(+b.dataset.z)*.25));render()});
-  document.querySelectorAll('tr[data-r]').forEach(tr=>{const r=rowById(tr.dataset.r);if(!r)return;
-    tr.querySelector('[data-ok]').onchange=e=>{r.ok=e.target.checked;touch();render()};
-    tr.querySelectorAll('[data-k]').forEach(i=>i.onchange=()=>{const k=i.dataset.k;let v=i.value;
-      if(k==='excl'||k==='incl'){const o=k==='excl'?'incl':'excl';r[k]=num(v);
-        if(r.calc===o||r[o]==null){r.calc=o;fixVat(r)}else if(r.calc===k)r.calc=''}
-      else if(k==='rate'){r.rate=v===''?null:+v;if(!r.calc)r.calc='excl';fixVat(r)}
-      else if(k==='cat'){r.cat=v;r.catSrc='user';if(v&&v!=='skip')rememberSupplier(r,v)}
-      else r[k]=v.trim();
-      if(k==='excl'||k==='incl')r.flag=false;
-      if((k==='sup'||k==='svc')&&!r.cat){const s=suggest(r,r.ai);r.cat=s.cat;r.catSrc=s.src}
-      touch();rr()});
-    const pg=tr.querySelector('[data-pg]');if(pg)pg.onclick=()=>{const i=S.pages.findIndex(p=>p.n==pg.dataset.pg);if(i>=0){S.pageSel=i;render()}};
-    tr.querySelector('[data-delr]').onclick=()=>{const i=S.P.rows.indexOf(r);S.P.rows.splice(i,1);S.undo={r,i};touch();render();toast('השורה נמחקה',[['ביטול',()=>{S.P.rows.splice(S.undo.i,0,S.undo.r);touch();render()}]])};
-  });
-  document.querySelectorAll('tr[data-g]').forEach(tr=>{const k=tr.dataset.g;const rs=S.P.rows.filter(r=>gkey(r)===k);
-    tr.querySelector('[data-tg]').onclick=()=>{S.open[k]=!S.open[k];render()};
-    tr.querySelector('[data-gok]').onchange=e=>{rs.forEach(r=>r.ok=e.target.checked);touch();render()};
-    tr.querySelector('[data-gcat]').onchange=e=>{const v=e.target.value;if(v==='mixed')return;rs.forEach(r=>{r.cat=v;r.catSrc='user'});if(v&&v!=='skip')rememberSupplier(rs[0],v);touch();render()};
-  });
-}
-function clsView(){
-  const gs=groups();const P=S.P;
-  const un=gs.filter(([k,rs])=>rs.some(r=>!r.cat));
-  const sg=gs.filter(([k,rs])=>rs.every(r=>r.cat)&&rs.some(r=>r.catSrc==='rule'||r.catSrc==='ai'));
-  const tot={};Object.keys(CATS).forEach(c=>tot[c]=0);P.rows.forEach(r=>{if(r.cat)tot[r.cat]+=+r.incl||0});
-  const all=Object.entries(tot).filter(([c])=>c!=='skip').reduce((s,[,v])=>s+v,0);
-  const qCard=([k,rs],mode)=>{const r=rs[0];const sI=rs.reduce((s,x)=>s+(+x.incl||0),0);const cur=rs[0].cat;
-    return `<div class="q" data-q="${esc(k)}"><div class="h"><div><b>${esc(r.sup||'ללא שם ספק')}</b> · ${esc(r.svc||'ללא תיאור')}${rs.length>1?` <span class="chip">${rs.length} שורות</span>`:''}</div><b class="n">${money(sI)} ₪</b></div>
-    ${mode==='q'?'<div>לאיזה גורם לשייך את הסכום?</div>':`<div class="small">הצעת המערכת: <span class="chip sug">${CATS[cur]}</span> <span class="muted">(${rs[0].catSrc==='ai'?'לפי קריאת הדוח':'לפי סוג השירות'})</span></div>`}
-    <div class="opts">${Object.entries(CATS).map(([c,l])=>`<button class="sm ${mode==='s'&&c===cur?'pri':''}" data-c="${c}">${l}</button>`).join('')}</div>
-    <label class="row small muted" style="gap:6px"><input type="checkbox" data-rem checked style="width:auto"> לזכור את השיוך לספק זה בפרויקטים הבאים</label></div>`};
-  return `<div class="cats">${['exec','plan','mgmt','fee','levy'].map(c=>`<div class="cat"><span class="small muted">${CATS[c]}</span><b>${money0(tot[c])}</b><span class="small muted">${all?(tot[c]/all*100).toFixed(1)+'%':''}</span></div>`).join('')}</div>
-  <h3>שאלות פתוחות ${un.length?`<span class="badge b">${un.length}</span>`:'<span class="badge ok">אין</span>'}</h3>
-  <p class="muted small">המערכת לא הצליחה לשייך את השורות האלה. בחרו לכל אחת את הגורם.</p>
-  ${un.map(g=>qCard(g,'q')).join('')||'<p class="muted">כל השורות משויכות.</p>'}
-  <h3 style="margin-top:24px">הצעות לאישור ${sg.length?`<span class="badge w">${sg.length}</span>`:''}</h3>
-  ${sg.length?`<p class="muted small">המערכת שייכה לפי סוג השירות או לפי קריאת הדוח. אשרו או שנו.</p><button class="pri" id="accAll" style="margin-bottom:10px">אישור כל ההצעות (${sg.length})</button>${sg.map(g=>qCard(g,'s')).join('')}`:'<p class="muted">אין הצעות פתוחות.</p>'}`;
-}
-function bindCls(){
-  document.querySelectorAll('[data-q]').forEach(el=>{const k=el.dataset.q;const rs=S.P.rows.filter(r=>gkey(r)===k);
-    el.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{const c=b.dataset.c;rs.forEach(r=>{r.cat=c;r.catSrc='user'});if(el.querySelector('[data-rem]').checked&&c!=='skip')rememberSupplier(rs[0],c);touch();render()})});
-  const a=$('#accAll');if(a)a.onclick=()=>{const seen=new Set();S.P.rows.forEach(r=>{if(r.cat&&(r.catSrc==='rule'||r.catSrc==='ai')){r.catSrc='user';const k=gkey(r);if(!seen.has(k)&&r.cat!=='skip'){seen.add(k);rememberSupplier(r,r.cat)}}});touch();render()};
-}
-function expView(){
+  if(a&&a.matches&&a.matches('input,select,textarea')){if(a.dataset.f)sel=`[data-f="${a.dataset.f}"]`;else if(a.dataset.pf)sel=`[data-pf="${a.dataset.pf}"]`;else if(a.dataset.lf){const t2=a.closest('tr[data-ids]');if(t2)sel=`tr[data-ids="${t2.dataset.ids}"] [data-lf="${a.dataset.lf}"]`}try{pos=a.selectionStart}catch(e){}}
+  const y=window.scrollY;render();window.scrollTo(0,y);if(sel){const n=document.querySelector(sel);if(n){n.focus({preventScroll:true});try{if(pos!=null)n.setSelectionRange(pos,pos)}catch(e){}}}},0)}
+/* ----- step 3: sheet (check, classify, export) ----- */
+function sheetView(){
   const st=stats(),P=S.P,vat=projVat();
   const L=buildLines(P,S.expGrouped);
   const SEC=[['exec',2,'עלויות ביצוע (COST)','ביצוע'],['plan',3,'עלויות תכנון','תכנון'],['mgmt',4,'עלויות ניהול ופיקוח','ניהול ופיקוח הנדסי'],['fee',5,'עמלת חברה עירונית','ניהול כולל של הפרויקט'],['levy',6,"אגרות, היטלים, מעבדות, מכון בקרה וכד'","אגרות וכו'"]];
   const sum=k=>L[k].reduce((a,l)=>({e:a.e+l.excl,i:a.i+l.incl}),{e:0,i:0});const S2={};SEC.forEach(([k])=>S2[k]=sum(k));
   const ov={e:S2.plan.e+S2.mgmt.e+S2.fee.e+S2.levy.e,i:S2.plan.i+S2.mgmt.i+S2.fee.i+S2.levy.i},tot={e:S2.exec.e+ov.e,i:S2.exec.i+ov.i};
   const pc=(v,b)=>b?(v/b*100).toFixed(2)+'%':'';const m0=v=>Number(v||0).toLocaleString('he-IL',{maximumFractionDigits:0});
-  const items=[[!st.missing,st.missing?`חסרים ${st.missing} שדות חובה בנתוני הפרויקט`:'נתוני הפרויקט מלאים'],
-    [!st.unassigned,st.unassigned?`${st.unassigned} שורות לא משויכות – לא ייכללו בטבלה`:'כל השורות משויכות'],
-    [!st.flag,st.flag?`${st.flag} שורות שזוהו בחוסר ודאות עדיין לא נבדקו`:'אין שורות פתוחות מהזיהוי'],
-    [P.reportIncl?Math.abs(st.dI)<1:false,P.reportIncl?(Math.abs(st.dI)<1?'הסה"כ תואם לדוח':`הפרש של ${money(st.dI)} ₪ מול סה"כ הדוח`):'לא הוזן סה"כ הדוח להשוואה']];
   const gen=[['name','שם הפרויקט'],['desc','תיאור הפרויקט (תכולה)'],['area','שטח בניה עפ"י היתר (מ"ר)','num'],['company','חברה מבצעת'],['pm','מנהל פרויקט הנדסי'],['finalDate','תאריך חשבון סופי','date'],['deliveryDate','תאריך מסירה','date'],['index','מדד תשומות הבנייה','num']];
   const PH={devCost:'900',bnm:'15'};
-  const inp=(k,t,w)=>`<input data-pf="${k}" ${t==='date'?'type="date"':t==='num'?'inputmode="decimal"':''} value="${esc(P[k]==null?'':P[k])}" placeholder="${PH[k]||''}" style="border-color:var(--line);${w||''}">`;
-  const line=(l,no,i,k,flab)=>{const one=l.ids.length===1;return `<tr data-ids="${l.ids.join(',')}"><td class="n">${no}.${i+1}</td>
-    <td><input data-lf="sup" value="${esc(l.sup)}" aria-label="תאור"></td><td><input data-lf="svc" value="${esc(l.svc)}" aria-label="תפקיד בפרויקט"></td>
-    <td><select data-lf="cat" aria-label="שיוך">${Object.entries(CATS).map(([c,lb])=>`<option value="${c}" ${c===k?'selected':''}>${c===k?flab:lb}</option>`).join('')}</select></td>
-    <td class="n">${one?`<input class="num" data-lf="excl" value="${fx(l.excl)}">`:money(l.excl)}</td><td class="n">${one?`<input class="num" data-lf="incl" value="${fx(l.incl)}">`:`<span title="סכום של ${l.ids.length} שורות – לעריכה עברו לשלב 3">${money(l.incl)}</span>`}</td>
-    <td class="n">${pc(l.incl,tot.i)}</td><td class="n">${pc(l.incl,S2.exec.i)}</td><td><input data-lf="note" value="${esc(l.note)}" aria-label="הערות"></td></tr>`};
-  const totRow=(t,v,big)=>`<tr class="grp" style="${big?'background:var(--mint)':''}"><td colspan="4">${t}</td><td class="n">${money(v.e)}</td><td class="n">${money(v.i)}</td><td class="n">${pc(v.i,tot.i)}</td><td class="n">${pc(v.i,S2.exec.i)}</td><td></td></tr>`;
+  const inpR=k=>`<input data-pf="${k}" inputmode="decimal" value="${esc(P[k]||'')}" placeholder="${k==='reportIncl'?'כולל מע&quot;מ':'ללא מע&quot;מ'}" style="border-color:var(--line);width:150px;display:inline-block;background:#fff">`;
+  const inp=(k,t,w)=>`<input data-pf="${k}" ${t==='date'?'type="date"':t==='num'?'inputmode="decimal"':''} value="${esc(P[k]==null?'':P[k])}" placeholder="${PH[k]||''}" style="border-color:var(--line);background:#fff;${w||''}">`;
+  const byId=id=>P.rows.find(r=>r.id===id);
+  const dupKey=r=>normName(r.sup)+'|'+Math.round((+r.incl||+r.excl||0)*100);const dupN={};P.rows.forEach(r=>{if(r.cat!=='skip'){const k=dupKey(r);dupN[k]=(dupN[k]||0)+1}});
+  const issues=l=>{const rs=l.ids.map(byId).filter(Boolean),out=[];
+    if(rs.some(r=>r.flag&&!r.ok))out.push('זוהה בחוסר ודאות – לבדוק מול הסריקה');
+    rs.forEach(r=>{if(vatFlag(r))out.push(`יחס מע"מ ${implied(r).toFixed(1)}% – לא תואם`)});
+    if(!(+l.incl)&&!(+l.excl))out.push('סכום חסר');
+    if(!String(l.sup||'').trim())out.push('חסר שם ספק');
+    if(l.incl<0||l.excl<0)out.push('סכום שלילי (זיכוי?)');
+    if(rs.some(r=>dupN[dupKey(r)]>1&&!r.dupOk&&(+r.incl||+r.excl)))out.push('כפילות אפשרית – אותו ספק ואותו סכום');
+    if(rs.some(r=>r.cat&&r.cat!=='skip'&&(r.catSrc==='rule'||r.catSrc==='ai')))out.push('שיוך מוצע – לאשר את הפרק');
+    return [...new Set(out)]};
+  let nIss=0;
+  const line=(l,no,i,k,flab)=>{const one=l.ids.length===1,iss=issues(l);if(iss.length)nIss++;if(S.pvIssues&&!iss.length)return '';
+   const r0=one?byId(l.ids[0]):null;
+   return `<tr class="ln" data-ids="${l.ids.join(',')}" ${iss.length?'style="background:var(--warn)"':''}><td class="n c0" style="white-space:nowrap">${one?'<button class="sm ghost" data-delline title="מחיקת שורה" aria-label="מחיקת שורה">✕</button>':''}${no}.${i+1}${r0&&r0.page&&S.pages.length?` <button class="sm ghost" data-scan="${r0.page}" title="הצג בסריקה">עמ' ${r0.page}</button>`:''}</td>
+    <td style="min-width:240px" data-l="תאור"><input data-lf="sup" value="${esc(l.sup)}" aria-label="תאור">${iss.length?`<div style="padding:2px 6px">${iss.map(t=>`<div class="small" style="color:var(--warnInk);font-weight:600">⚠ ${t}</div>`).join('')}<button class="sm" data-okline style="margin-top:4px;min-height:28px">✓ בדקתי – תקין</button></div>`:''}</td><td style="min-width:150px" data-l="תפקיד בפרויקט"><input data-lf="svc" value="${esc(l.svc)}" aria-label="תפקיד בפרויקט"></td>
+    <td style="min-width:150px" data-l="שיוך (פרק)"><select data-lf="cat" aria-label="שיוך">${k?'':'<option value="" selected>— לבחור פרק —</option>'}${Object.entries(CATS).map(([c,lb])=>`<option value="${c}" ${c===k?'selected':''}>${c===k?flab:lb}</option>`).join('')}</select></td>
+    <td class="n" data-l="ללא מע&quot;מ">${one?`<input class="num" data-lf="excl" value="${fx(l.excl)}" style="${r0&&r0.calc==='excl'?'font-style:italic':''}">`:money(l.excl)}</td><td class="n" data-l="כולל מע&quot;מ">${one?`<input class="num" data-lf="incl" value="${fx(l.incl)}" style="${r0&&r0.calc==='incl'?'font-style:italic':''}">`:`<span title="סכום של ${l.ids.length} שורות – לעריכה עברו לתצוגה מפורטת">${money(l.incl)}</span>`}</td>
+    <td class="n" data-l="% מהפרויקט">${pc(l.incl,tot.i)}</td><td class="n" data-l="% מהביצוע">${pc(l.incl,S2.exec.i)}</td><td data-l="הערות"><input data-lf="note" value="${esc(l.note)}" aria-label="הערות"></td><td data-l="תאריך">${one?`<input type="date" data-lf="date" value="${esc(l.date||'')}" style="width:140px">`:`<span class="small">${esc(fmtD(l.date))}</span>`}</td></tr>`};
+  const totRow=(t,v,big)=>`<tr class="${big?'big':'tot'}"><td colspan="4">${t}</td><td class="n" data-l="ללא מע&quot;מ">${money(v.e)}</td><td class="n" data-l="כולל מע&quot;מ">${money(v.i)}</td><td class="n" data-l="% מהפרויקט">${pc(v.i,tot.i)}</td><td class="n" data-l="% מהביצוע">${pc(v.i,S2.exec.i)}</td><td class="e"></td><td class="e"></td></tr>`;
   const a=+P.area||0,dv=+P.devArea||0,dc=+P.devCost||900,bn=1+(+P.bnm||15)/100,ratio=a?dv/a:0,d5=dc*ratio,d5i=d5*(1+vat/100);
   const p4=a?[tot.e/a,tot.i/a,S2.exec.e/a,S2.exec.i/a]:[0,0,0,0];
   const sq=[['שטח הפרויקט עפ"י היתר (מ"ר)',[m0(a)]],['שטח הפיתוח (מ"ר)',[inp('devArea','num','width:110px')]],['יחס שטח פיתוח/שטח בניה',[ratio.toFixed(2)]],
-    ['עלות למ"ר בינוי + פיתוח (₪/מ"ר)',p4.map(m0)],[`עלות פיתוח למ"ר בניה (הנחה: ${inp('devCost','num','width:80px')} ₪/מ"ר)`,['','',m0(d5),m0(d5i)]],
-    ['עלות למ"ר בינוי בסיסי (₪/מ"ר)',['','',m0(p4[2]-d5),m0(p4[3]-d5i)]],[`בניכוי ב.נ.מ. ${inp('bnm','num','width:60px')}% (₪/מ"ר)`,['','',m0((p4[2]-d5)/bn),m0((p4[3]-d5i)/bn)]]];
-  return `<div class="chk">${items.map(([ok,t])=>`<div class="${ok?'ok':'w'}">${ok?'✓':'!'} ${t}</div>`).join('')}</div>
-  <div class="row" style="margin:10px 0 14px;justify-content:space-between"><h3>תצוגה מקדימה – כך ייראה האקסל</h3>
-   <span class="row"><span class="small muted">ספק ושירות זהים:</span><span class="seg"><button data-eg="1" class="${S.expGrouped?'on':''}">שורה מסכמת</button><button data-eg="0" class="${S.expGrouped?'':'on'}">כל שורה בנפרד</button></span></span></div>
-  <p class="small muted" style="margin-top:-6px">אפשר לתקן כאן ישירות: נתוני הפרויקט, תאור, תפקיד, שיוך (העברה לפרק אחר), סכומים של שורה בודדת והערות. הסיכומים והאחוזים מתעדכנים מיד. סכום של שורה מסכמת מתקנים בשלב 3.</p>
-  <div class="tblwrap" style="max-height:none"><table class="rt" id="pv" style="min-width:1180px">
-   <thead><tr><th>מס"ד</th><th>תאור</th><th>תפקיד בפרויקט</th><th>שיוך</th><th class="n">ללא מע"מ</th><th class="n">כולל מע"מ</th><th class="n">% מהפרויקט</th><th class="n">% מהביצוע</th><th>הערות</th></tr></thead>
-   <tbody><tr class="grp"><td colspan="9">1. נתונים כלליים <span class="muted small" style="font-weight:400">· עדכון אחרון: ${fmtDT(new Date(P.updatedAt))}</span></td></tr>
-   ${gen.map(([k,lb,t],i)=>`<tr><td class="n">1.${i+1}</td><td>${lb}</td><td colspan="7">${k==='desc'?`<textarea data-pf="desc" style="min-height:40px">${esc(P.desc||'')}</textarea>`:inp(k,t,'max-width:420px')}</td></tr>`).join('')}
-   ${SEC.map(([k,no,title,flab])=>`<tr class="grp"><td colspan="9">${no}. ${title}</td></tr>${L[k].length?L[k].map((l,i)=>line(l,no,i,k,flab)).join(''):'<tr><td></td><td colspan="8" class="muted small">אין שורות בפרק</td></tr>'}${totRow('סה"כ '+title,S2[k])}`).join('')}
+    ['עלות למ"ר בינוי + פיתוח (₪/מ"ר)',p4.map(m0)],[`עלות פיתוח למ"ר בניה (הנחה: ${inp('devCost','num','width:80px;display:inline-block')} ₪/מ"ר)`,['','',m0(d5),m0(d5i)]],
+    ['עלות למ"ר בינוי בסיסי (₪/מ"ר)',['','',m0(p4[2]-d5),m0(p4[3]-d5i)]],[`בניכוי ב.נ.מ. ${inp('bnm','num','width:60px;display:inline-block')}% (₪/מ"ר)`,['','',m0((p4[2]-d5)/bn),m0((p4[3]-d5i)/bn)]]];
+  const un=P.rows.filter(r=>!r.cat);
+  let reconRows='';
+  if(P.reportIncl||P.reportExcl){const dI=P.reportIncl?tot.i-P.reportIncl:null,dE=P.reportExcl?tot.e-P.reportExcl:null,bad=(dI!=null&&Math.abs(dI)>=1)||(dE!=null&&Math.abs(dE)>=1);if(bad)nIss++;
+    reconRows=`<tr style="background:${bad?'var(--bad)':'var(--mint)'}"><td colspan="4"><b>סה"כ לפי הדוח</b> ${inpR('reportExcl')} ${inpR('reportIncl')}</td><td class="n">${P.reportExcl?money(P.reportExcl):''}</td><td class="n">${P.reportIncl?money(P.reportIncl):''}</td><td colspan="4"></td></tr>
+     <tr style="background:${bad?'var(--bad)':'var(--mint)'}"><td colspan="4"><b>${bad?'⚠ הפרש מול הדוח':'✓ תואם לדוח'}</b>${bad?' <span class="small">– בדקו שורות מסומנות, שורות חסרות או שורה שנקלטה פעמיים</span>':''}</td><td class="n"><b>${dE!=null?money(dE):''}</b></td><td class="n"><b>${dI!=null?money(dI):''}</b></td><td colspan="4"></td></tr>`}
+  else{nIss++;reconRows=`<tr style="background:var(--warn)"><td colspan="10">⚠ לא הוזן סה"כ הדוח להשוואה: ללא מע"מ ${inpR('reportExcl')} כולל מע"מ ${inpR('reportIncl')}</td></tr>`}
+  const tbl=`<div class="tblwrap"><table class="rt" id="pv">
+   <thead><tr><th>מס"ד</th><th>תאור</th><th>תפקיד בפרויקט</th><th>שיוך</th><th class="n">ללא מע"מ</th><th class="n">כולל מע"מ</th><th class="n">% מהפרויקט</th><th class="n">% מהביצוע</th><th>הערות</th><th>תאריך</th></tr></thead>
+   <tbody><tr class="sec"><td colspan="10">1. נתונים כלליים <span style="font-weight:400;opacity:.8;font-size:13px">· עדכון אחרון: ${fmtDT(new Date(P.updatedAt))}</span></td></tr>
+   ${gen.map(([k,lb,t],i)=>{const req=FIELDS.find(f=>f[0]===k&&f[2]),miss=req&&(P[k]==null||P[k]==='');if(S.pvIssues&&!miss)return '';if(miss)nIss++;return `<tr ${miss?'style="background:var(--bad)"':''}><td class="n">1.${i+1}</td><td>${lb}${miss?' <b style="color:var(--badInk)">– חובה, חסר</b>':''}</td><td colspan="8">${k==='desc'?`<textarea data-pf="desc" style="min-height:40px;background:#fff">${esc(P.desc||'')}</textarea>`:inp(k,t,'max-width:420px')}</td></tr>`}).join('')}
+   ${un.length?(nIss+=0,`<tr class="sec" style="background:var(--badInk)"><td colspan="10">לא משויך – ${un.length} שורות: בחרו לכל אחת פרק (הן לא ייכללו באקסל עד אז)</td></tr>`+un.map((r,i)=>line({sup:r.sup,svc:r.svc,date:r.date,excl:+r.excl||0,incl:+r.incl||0,note:r.note||'',ids:[r.id]},'?',i,'','')).join('')):''}
+   ${SEC.map(([k,no,title,flab])=>`<tr class="sec"><td colspan="10">${no}. ${title}</td></tr>${L[k].length?L[k].map((l,i)=>line(l,no,i,k,flab)).join(''):'<tr><td></td><td colspan="9" class="muted small">אין שורות בפרק</td></tr>'}${totRow('סה"כ '+title,S2[k])}`).join('')}
    ${totRow('סה"כ תקורות (תכנון, ניהול, פיקוח, אגרות, היטלים ועמלה)',ov)}${totRow('סה"כ עלות הפרויקט (PRICE)',tot,1)}
-   <tr class="grp"><td colspan="9">8. עלות מ"ר בניה <span class="muted small" style="font-weight:400">· עמודות: PRICE ללא/כולל מע"מ · COST ללא/כולל מע"מ</span></td></tr>
-   ${sq.map(([t,v],i)=>`<tr><td class="n">8.${i+1}</td><td colspan="3">${t}</td>${[0,1,2,3].map(j=>`<td class="n">${v[j]==null?'':v[j]}</td>`).join('')}<td></td></tr>`).join('')}
-   </tbody></table></div>
-  <div class="q" style="margin-top:16px"><label class="row" style="gap:10px"><input type="checkbox" id="okPv" style="width:auto" ${S.pvOk?'checked':''}> <b>בדקתי את הטבלה – הנתונים תקינים</b></label>
-  <div class="row"><button class="pri" id="dl" ${S.dl&&S.pvOk?'':'disabled'}>הפקת קובץ Excel</button><span class="small muted">הקובץ כולל את הטבלה הזו עם נוסחאות, וגיליון פירוט שורות מהדוח.</span></div></div>`;
+   ${reconRows}
+   <tr class="sec"><td colspan="10">8. עלות מ"ר בניה <span style="font-weight:400;opacity:.8;font-size:13px">· עמודות: PRICE ללא/כולל מע"מ · COST ללא/כולל מע"מ</span></td></tr>
+   ${sq.map(([t,v],i)=>`<tr><td class="n">8.${i+1}</td><td colspan="3">${t}</td>${[0,1,2,3].map(j=>`<td class="n">${v[j]==null?'':v[j]}</td>`).join('')}<td></td><td></td></tr>`).join('')}
+   </tbody></table></div>`;
+  const drawer=S.scanOpen&&S.pages.length?`<div class="drawer"><div class="bar2"><b>סריקת הדוח</b>${S.pages.map((p,i)=>`<button class="sm ${S.pageSel===i?'pri':''}" data-vp="${i}">${p.n}</button>`).join('')}<span style="flex:1"></span><button class="sm" data-z="-1">−</button><button class="sm" data-z="1">+</button><button class="sm" id="scanX">✕ סגירה</button></div>
+   <div class="img"><img src="${S.pages[S.pageSel]?S.pages[S.pageSel].url:''}" alt="עמוד מהדוח" style="width:${S.zoom*100}%"></div></div>`:'';
+  return `<div class="toolbar ${S.tbOpen?'open':''}">${nIss?`<span class="chip miss" style="font-size:15px;padding:6px 14px">⚠ ${nIss} אי התאמות</span><button class="sm" id="pvIss">${S.pvIssues?'הצג את כל הגיליון':'הצג רק אי התאמות'}</button>`:'<span class="chip conf" style="font-size:15px;padding:6px 14px">✓ לא נמצאו אי התאמות</span>'}
+   <button class="sm mob" id="tbT">${S.tbOpen?'סגירת כלים ▴':'כלים ▾'}</button><div class="tbx">
+   ${st.sug?`<button class="sm" id="accSug">אישור כל השיוכים המוצעים (${st.sug})</button>`:''}
+   <button class="sm" id="addRow">+ שורה ידנית</button>
+   ${S.pages.length?`<button class="sm" id="scanT">${S.scanOpen?'הסתר סריקה':'הצג סריקה'}</button>`:''}
+   <span style="flex:1"></span><span class="small muted">תצוגה:</span><span class="seg"><button data-eg="0" class="${S.expGrouped?'':'on'}">מפורטת</button><button data-eg="1" class="${S.expGrouped?'on':''}">שורה מסכמת לספק</button></span></div></div>
+  <p class="small muted" style="margin:0 0 10px">זה הגיליון שיופק לאקסל. מתקנים כאן ישירות – נתוני הפרויקט, תאור, תפקיד, פרק (שיוך), סכומים, הערות ותאריך – והסיכומים מתעדכנים מיד. שורה צהובה דורשת בדיקה; אחרי הבדיקה לוחצים "✓ בדקתי – תקין".</p>
+  ${tbl}
+  <div class="export"><div><h3 style="color:#fff">הפקת דוח ניתוח עלויות</h3><p style="margin:4px 0 0;color:#CFE6EC" class="small">אקסל במבנה התבנית עם נוסחאות${S.expGrouped?', שורה מסכמת לכל ספק':', כל שורה בנפרד'}, וגיליון פירוט שורות מהדוח.</p></div>
+   <div class="row"><label><input type="checkbox" id="okPv" style="width:22px;height:22px" ${S.pvOk?'checked':''}> בדקתי את הגיליון – הנתונים תקינים</label><button class="pri" id="dl" ${S.pvOk?'':'disabled'}>הפקת Excel</button></div></div>
+  ${drawer}`;
+
 }
-function bindExp(){
+
+function bindSheet(){
   document.querySelectorAll('[data-eg]').forEach(b=>b.onclick=()=>{S.expGrouped=b.dataset.eg==='1';render()});
   const ok=$('#okPv');if(ok)ok.onchange=()=>{S.pvOk=ok.checked;render()};
-  document.querySelectorAll('#pv [data-pf]').forEach(i=>i.onchange=()=>{const k=i.dataset.pf;let v=i.value.trim();if(/area|index|devArea|devCost|bnm/.test(k))v=num(v);S.P[k]=v;if(S.P.src&&!/devArea|devCost|bnm/.test(k))S.P.src[k]=v===''||v==null?'':'manual';S.pvOk=false;touch();rr()});
+  const tb=$('#tbT');if(tb)tb.onclick=()=>{S.tbOpen=!S.tbOpen;render()};
+  const pi=$('#pvIss');if(pi)pi.onclick=()=>{S.pvIssues=!S.pvIssues;render()};
+  const st=$('#scanT');if(st)st.onclick=()=>{S.scanOpen=!S.scanOpen;render()};
+  const sx=$('#scanX');if(sx)sx.onclick=()=>{S.scanOpen=false;render()};
+  document.querySelectorAll('[data-vp]').forEach(b=>b.onclick=()=>{S.pageSel=+b.dataset.vp;render()});
+  document.querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{S.zoom=Math.max(.5,Math.min(3,S.zoom+(+b.dataset.z)*.25));render()});
+  document.querySelectorAll('[data-scan]').forEach(b=>b.onclick=()=>{const i=S.pages.findIndex(p=>p.n==b.dataset.scan);if(i>=0){S.pageSel=i;S.scanOpen=true;render()}});
+  const as=$('#accSug');if(as)as.onclick=()=>{const seen=new Set();S.P.rows.forEach(r=>{if(r.cat&&r.cat!=='skip'&&(r.catSrc==='rule'||r.catSrc==='ai')){r.catSrc='user';const k=gkey(r);if(!seen.has(k)){seen.add(k);rememberSupplier(r,r.cat)}}});S.pvOk=false;touch();render()};
+  $('#addRow').onclick=()=>{S.P.rows.push({id:uid(),sup:'',svc:'',date:'',excl:null,incl:null,rate:null,calc:'',page:null,note:'',ok:false,src:'manual',cat:''});S.expGrouped=false;S.pvIssues=false;touch();render();const t=document.querySelector('#pv tbody tr[data-ids] [data-lf=sup]');if(t){t.scrollIntoView({block:'center'});t.focus()}};
+  document.querySelectorAll('#pv [data-okline]').forEach(b=>b.onclick=()=>{const ids=b.closest('tr').dataset.ids.split(',');const rs=S.P.rows.filter(r=>ids.includes(r.id));rs.forEach(r=>{r.ok=true;r.flag=false;r.vatOk=true;r.dupOk=true;if(r.catSrc==='rule'||r.catSrc==='ai')r.catSrc='user'});if(rs[0]&&rs[0].cat&&rs[0].cat!=='skip')rememberSupplier(rs[0],rs[0].cat);S.pvOk=false;touch();rr()});
+  document.querySelectorAll('#pv [data-delline]').forEach(b=>b.onclick=()=>{const id=b.closest('tr').dataset.ids;const i=S.P.rows.findIndex(r=>r.id===id);if(i<0)return;const r=S.P.rows.splice(i,1)[0];S.pvOk=false;touch();rr();toast('השורה נמחקה',[['ביטול',()=>{S.P.rows.splice(i,0,r);touch();render()}]])});
+  document.querySelectorAll('#pv [data-pf]').forEach(i=>i.onchange=()=>{const k=i.dataset.pf;let v=i.value.trim();if(/area|index|devArea|devCost|bnm|report/.test(k))v=num(v);S.P[k]=v;if(S.P.src&&!/devArea|devCost|bnm|report/.test(k))S.P.src[k]=v===''||v==null?'':'manual';S.pvOk=false;touch();rr()});
   document.querySelectorAll('#pv tr[data-ids]').forEach(tr=>{const rows=tr.dataset.ids.split(',').map(id=>S.P.rows.find(r=>r.id===id)).filter(Boolean);
     tr.querySelectorAll('[data-lf]').forEach(i=>i.onchange=()=>{const k=i.dataset.lf,v=i.value;
-      if(k==='sup'||k==='svc')rows.forEach(r=>r[k]=v.trim());
+      if(k==='sup'||k==='svc'||k==='date')rows.forEach(r=>r[k]=v.trim());
       else if(k==='note')rows.forEach((r,j)=>r.note=j?'':v.trim());
       else if(k==='cat'){rows.forEach(r=>{r.cat=v;r.catSrc='user'});if(v&&v!=='skip')rememberSupplier(rows[0],v)}
       else if(k==='excl'||k==='incl'){const r=rows[0],o=k==='excl'?'incl':'excl';r[k]=num(v);r.flag=false;if(r.calc===o||r[o]==null){r.calc=o;fixVat(r)}else if(r.calc===k)r.calc=''}
+      if((k==='sup'||k==='svc')&&rows[0]&&!rows[0].cat){const s=suggest(rows[0]);if(s.cat){rows.forEach(r=>{r.cat=s.cat;r.catSrc=s.src})}}
       S.pvOk=false;touch();rr()})});
   const b=$('#dl');if(b)b.onclick=async()=>{
-    try{const P=S.P;const wb=buildWB(ExcelJS,P,{grouped:S.expGrouped,vat:projVat()});const buf=await wb.xlsx.writeBuffer();
+    try{const P=S.P;const wb=buildWB(ExcelJS,P,{grouped:S.expGrouped,vat:projVat(),logo:S.gen.logo});const buf=await wb.xlsx.writeBuffer();
       const d=new Date(P.updatedAt);const p=n=>String(n).padStart(2,'0');
       const fn=`ניתוח עלויות - ${P.num?'פרויקט '+P.num+' - ':''}${(P.name||'ללא שם').replace(/[\\/:*?"<>|]/g,'')} - ${p(d.getDate())}${p(d.getMonth()+1)}${d.getFullYear()}.xlsx`;
-      await S.dl.save({filename:fn,data:new Blob([buf])});toast('הקובץ ירד למחשב')}
+      await S.dl.save({filename:fn,data:new Blob([buf])});P.exportedAt=Date.now();P.updatedAt=P.exportedAt;dirty=true;await save();render();toast('הקובץ ירד למחשב')}
     catch(e){if(e&&e.code==='declined')return;toast('ההפקה לא הושלמה'+(e&&e.message?': '+e.message:''))}};
+}
+/* ----- settings & backup ----- */
+function downloadJSON(obj,name){S.dl.save({filename:name,data:new Blob([JSON.stringify(obj,null,1)],{type:'application/json'})})}
+async function saveGen(){if(S.db){try{await S.db.doc('settings/general').set(JSON.parse(JSON.stringify(S.gen)))}catch(e){toast('השמירה נכשלה')}}else LS.set('gen',S.gen)}
+function settingsView(){
+  const t=S.stab||'general';
+  const tabs=[['general','כללי'],['vat','שיעורי מע"מ'],['sup','מאגר ספקים'],['tpl','פורמטים של דוחות'],['backup','גיבוי ושחזור']];
+  let body='';
+  if(t==='general')body=`<div class="card"><div class="grid">
+    <div class="fld"><label><span>לוגו (מופיע בתפריט ובקובץ האקסל)</span></label><div class="row"><div class="brand" style="border:0;padding:0"><div class="logo" style="box-shadow:var(--sh)">${S.gen.logo?`<img src="${esc(S.gen.logo)}" alt="">`:IC.bld}</div></div><input type="file" id="logoF" accept="image/png,image/jpeg,image/svg+xml,image/webp" style="max-width:260px">${S.gen.logo?'<button class="sm" id="logoX">הסרה</button>':''}</div><p class="small muted">מעלים את קובץ הלוגו הרשמי של העירייה (PNG או SVG).</p></div>
+    <div class="fld"><label><span>שם הגוף (מופיע בתפריט ובדשבורד)</span></label><input data-g="org" value="${esc(S.gen.org||'')}" placeholder="עיריית תל אביב-יפו · אגף מבני ציבור"></div>
+    <div class="fld"><label><span>חברה מבצעת – ברירת מחדל לפרויקט חדש</span></label><input data-g="company" value="${esc(S.gen.company||'')}" placeholder="למשל: עזרה וביצרון"></div>
+    <div class="fld"><label><span>עלות פיתוח למ"ר – הנחת עבודה (₪)</span></label><input data-g="devCost" inputmode="decimal" value="${esc(S.gen.devCost||'')}" placeholder="900"></div>
+    <div class="fld"><label><span>ב.נ.מ. לניכוי (%)</span></label><input data-g="bnm" inputmode="decimal" value="${esc(S.gen.bnm||'')}" placeholder="15"></div>
+   </div></div>`;
+  if(t==='vat')body=`<div class="card" style="max-width:640px"><p class="muted" style="margin-top:0">המערכת בוחרת את שיעור המע"מ לפי תאריך החשבון הסופי. אפשר גם לקבוע שיעור לכל פרויקט ולכל שורה בנפרד.</p>
+    <table><thead><tr><th>בתוקף מתאריך</th><th>שיעור %</th><th></th></tr></thead><tbody>${S.vat.map((v,i)=>`<tr><td><input type="date" data-vf="${i}" value="${esc(v.from)}"></td><td><input data-vr="${i}" inputmode="decimal" value="${esc(v.rate)}" style="width:90px"></td><td><button class="sm ghost" data-vd="${i}">✕</button></td></tr>`).join('')}</tbody></table>
+    <div class="row" style="margin-top:12px"><button class="sm" id="va">+ שיעור חדש</button><span style="flex:1"></span><button class="pri" id="vs">שמירה</button></div></div>`;
+  if(t==='sup'){const q=(S.supQ||'').trim();const list=Object.entries(S.sup).filter(([k,v])=>!q||(v.sup+' '+v.svc).includes(q)).sort((a,b)=>String(a[1].sup).localeCompare(String(b[1].sup),'he'));
+    body=`<div class="card"><p class="muted" style="margin-top:0">שיוכים שהמערכת זוכרת לפי שם ספק (ולפעמים גם סוג שירות). הם מוחלים אוטומטית בכל פרויקט חדש.</p>
+    <input id="supQ" placeholder="חיפוש ספק" value="${esc(S.supQ||'')}" style="max-width:320px;margin-bottom:10px">
+    ${list.length?`<div class="tblwrap" style="max-height:520px;box-shadow:none;border:1px solid var(--line)"><table><thead><tr><th>ספק</th><th>סוג שירות</th><th>פרק</th><th></th></tr></thead><tbody>${list.map(([k,v])=>`<tr><td>${esc(v.sup)}</td><td>${esc(v.svc||'— כל השירותים —')}</td><td><select data-sk="${esc(k)}">${Object.entries(CATS).map(([c,l])=>`<option value="${c}" ${v.cat===c?'selected':''}>${l}</option>`).join('')}</select></td><td><button class="sm ghost" data-sdel="${esc(k)}">✕</button></td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">המאגר ריק. הוא מתמלא כשמאשרים שיוכים בגיליון הבדיקה.</p>'}</div>`}
+  if(t==='tpl')body=`<div class="card"><p class="muted" style="margin-top:0">פורמטים של דוחות שסימנתם בהם עמודות. בדוח חדש באותו פורמט הסימון מוחל אוטומטית.</p>
+    ${(S.tpl||[]).length?`<table><thead><tr><th>כותרות העמודות</th><th>סימון</th><th>נשמר</th><th></th></tr></thead><tbody>${S.tpl.map((x,i)=>`<tr><td class="small">${esc((x.header||[]).filter(Boolean).join(' | ')||'—')}</td><td class="small">${esc(x.roles.map(r=>(ROLES.find(z=>z[0]===r)||['',''])[1]).filter(Boolean).join(' · '))}</td><td class="small muted">${x.at?fmtDT(new Date(x.at)):''}</td><td><button class="sm ghost" data-tdel="${i}">✕</button></td></tr>`).join('')}</tbody></table>`:'<p class="muted">עדיין לא נשמרו פורמטים.</p>'}</div>`;
+  if(t==='backup')body=`<div class="dgrid"><div class="card"><h3>הורדת גיבוי מלא</h3><p class="muted">קובץ אחד עם כל הפרויקטים, מאגר הספקים, הפורמטים וההגדרות. מומלץ לגבות פעם בשבוע ולשמור בתיקייה משותפת.</p>
+    <p class="small">${S.gen.lastBackup?'גיבוי אחרון: '+fmtDT(new Date(S.gen.lastBackup)):'עדיין לא בוצע גיבוי.'}</p><button class="pri" id="bkAll">הורדת גיבוי (${S.projects.length} פרויקטים)</button></div>
+   <div class="card"><h3>שחזור מגיבוי</h3><p class="muted">טוענים קובץ גיבוי. פרויקטים עם אותו מזהה יוחלפו בגרסה שבגיבוי, ושאר הפרויקטים יישארו.</p><input type="file" id="rsF" accept="application/json,.json"></div></div>`;
+  return `<div class="head"><div><h1>הגדרות וגיבוי</h1><p>הגדרות כלליות, שיעורי מע"מ, המאגרים שהמערכת לומדת, וגיבוי הנתונים.</p></div></div>
+  <div class="stabs">${tabs.map(([k,l])=>`<button data-st="${k}" class="${t===k?'on':''}">${l}</button>`).join('')}</div>${body}`;
+}
+function bindSettings(){
+  document.querySelectorAll('[data-st]').forEach(b=>b.onclick=()=>{S.stab=b.dataset.st;render()});
+  document.querySelectorAll('[data-g]').forEach(i=>i.onchange=()=>{const k=i.dataset.g;S.gen[k]=/devCost|bnm/.test(k)?num(i.value):i.value.trim();saveGen();render();toast('נשמר')});
+  const lf=$('#logoF');if(lf)lf.onchange=async()=>{const f=lf.files[0];if(!f)return;const url=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(f)});
+    const img=new Image();img.onload=async()=>{const sc=Math.min(1,240/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.round(img.width*sc)||240;c.height=Math.round(img.height*sc)||240;c.getContext('2d').drawImage(img,0,0,c.width,c.height);S.gen.logo=c.toDataURL('image/png');await saveGen();render();toast('הלוגו נשמר')};img.src=url};
+  const lx=$('#logoX');if(lx)lx.onclick=async()=>{delete S.gen.logo;await saveGen();render()};
+  document.querySelectorAll('[data-vd]').forEach(b=>b.onclick=()=>{S.vat.splice(+b.dataset.vd,1);render()});
+  const va=$('#va');if(va)va.onclick=()=>{S.vat.push({from:new Date().toISOString().slice(0,10),rate:18});render()};
+  const vs=$('#vs');if(vs)vs.onclick=async()=>{S.vat=S.vat.map((v,i)=>({from:document.querySelector(`[data-vf="${i}"]`).value,rate:num(document.querySelector(`[data-vr="${i}"]`).value)})).filter(v=>v.from&&v.rate!=null).sort((a,b)=>a.from<b.from?-1:1);await saveVat();render();toast('שיעורי המע"מ נשמרו')};
+  const sq=$('#supQ');if(sq)sq.oninput=()=>{S.supQ=sq.value;const p=sq.selectionStart;render();const n=$('#supQ');n.focus();n.setSelectionRange(p,p)};
+  document.querySelectorAll('[data-sk]').forEach(s=>s.onchange=async()=>{const k=s.dataset.sk;S.sup[k].cat=s.value;if(S.db){try{await S.db.doc('suppliers/'+k).set(S.sup[k])}catch(e){}}else LS.set('sup',S.sup);toast('נשמר')});
+  document.querySelectorAll('[data-sdel]').forEach(b=>b.onclick=async()=>{const k=b.dataset.sdel;delete S.sup[k];if(S.db){try{await S.db.doc('suppliers/'+k).delete()}catch(e){}}else LS.set('sup',S.sup);render()});
+  document.querySelectorAll('[data-tdel]').forEach(b=>b.onclick=async()=>{const x=S.tpl.splice(+b.dataset.tdel,1)[0];if(S.db){try{await S.db.doc('templates/'+hash(x.sig)).delete()}catch(e){}}else LS.set('tpl',S.tpl);render()});
+  const bk=$('#bkAll');if(bk)bk.onclick=async()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');
+    downloadJSON({app:'final-accounts',v:1,at:Date.now(),projects:S.projects,suppliers:S.sup,templates:S.tpl||[],settings:{vat:S.vat,general:S.gen}},`גיבוי חשבונות סופיים - ${p(d.getDate())}-${p(d.getMonth()+1)}-${d.getFullYear()}.json`);
+    S.gen.lastBackup=Date.now();await saveGen();render()};
+  const rs=$('#rsF');if(rs)rs.onchange=async()=>{const f=rs.files[0];if(!f)return;let B;try{B=JSON.parse(await f.text());if(B.app!=='final-accounts')throw 0}catch(e){toast('הקובץ אינו גיבוי של המערכת');return}
+    const np=(B.projects||[]).length,ns=Object.keys(B.suppliers||{}).length,nt=(B.templates||[]).length;
+    dialog(`<h3>שחזור מגיבוי</h3><p>בקובץ: <b>${np}</b> פרויקטים, <b>${ns}</b> שיוכי ספקים, <b>${nt}</b> פורמטים${B.settings?' והגדרות':''}.</p><p class="muted small">פרויקטים עם אותו מזהה יוחלפו. גיבוי מ-${B.at?fmtDT(new Date(B.at)):'—'}.</p><div class="row"><button class="pri" data-ok>שחזור</button><button data-x>ביטול</button></div>`,el=>{
+      el.querySelector('[data-ok]').onclick=async()=>{closeDlg();toast('משחזר…');
+        for(const p of B.projects||[]){if(!p||!p.id)continue;if(S.db){try{await S.db.doc('projects/'+p.id).set(p)}catch(e){}}const i=S.projects.findIndex(x=>x.id===p.id);if(i>=0)S.projects[i]=p;else S.projects.push(p)}
+        for(const [k,v] of Object.entries(B.suppliers||{})){S.sup[k]=v;if(S.db){try{await S.db.doc('suppliers/'+k).set(v)}catch(e){}}}
+        for(const t of B.templates||[]){S.tpl=(S.tpl||[]).filter(x=>x.sig!==t.sig);S.tpl.push(t);if(S.db){try{await S.db.doc('templates/'+hash(t.sig)).set(t)}catch(e){}}}
+        if(B.settings&&B.settings.vat){S.vat=B.settings.vat;await saveVat()}
+        if(!S.db){LS.set('projects',S.projects);LS.set('sup',S.sup);LS.set('tpl',S.tpl)}
+        render();toast(`שוחזרו ${np} פרויקטים`)}})};
 }
 /* ---------- dialogs ---------- */
 function dialog(html,bind){$('#layer').innerHTML=`<div class="dlg" role="dialog" aria-modal="true"><div>${html}</div></div>`;const el=$('#layer .dlg>div');el.querySelectorAll('[data-x]').forEach(b=>b.onclick=closeDlg);$('#layer .dlg').onclick=e=>{if(e.target.classList.contains('dlg'))closeDlg()};bind&&bind(el)}
@@ -879,8 +1038,6 @@ function vatDialog(){
     el.querySelector('#vs').onclick=async()=>{S.vat=S.vat.map((v,i)=>({from:el.querySelector(`[data-vf="${i}"]`).value,rate:num(el.querySelector(`[data-vr="${i}"]`).value)})).filter(v=>v.from&&v.rate!=null).sort((a,b)=>a.from<b.from?-1:1);await saveVat();closeDlg();if(S.P){S.P.rows.forEach(r=>{if(r.calc&&r.rate==null)fixVat(r)});touch()}render()};
   });
 }
-$('#btnHome').onclick=async()=>{if(dirty)await save();S.view='list';S.P=null;render()};
-$('#btnVat').onclick=vatDialog;
 window.addEventListener('beforeunload',e=>{if(dirty){save();e.preventDefault()}});
 /* ---------- start ---------- */
 S.view='boot';render();
@@ -889,8 +1046,8 @@ S.dl={save:async({filename,data})=>{const u=URL.createObjectURL(data instanceof 
   for(let i=0;!window.FA_BACKEND&&i<100;i++)await new Promise(r=>setTimeout(r,50));
   let BE;try{BE=(await window.FA_BACKEND)||{mode:'local'}}catch(e){console.error(e);BE={mode:'local'};toast('החיבור ל-Firebase נכשל – עובדים במצב מקומי')}
   if(BE.mode==='firebase'){
-    S.sample=BE.sample;S.db=BE.db;S.view='list';await loadAll();render();
-  }else{S.view='list';await loadAll();render()}
+    S.sample=BE.sample;S.db=BE.db;S.view='dash';await loadAll();render();
+  }else{S.view='dash';await loadAll();render()}
 })();
 }
 </script>
