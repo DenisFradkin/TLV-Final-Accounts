@@ -115,12 +115,12 @@ tr.ok td:first-child{box-shadow:inset -4px 0 var(--mint)}
 window.FA_CONFIG = {
   // Firebase console > Project settings > General > Your apps > Web app > SDK setup and configuration (Config)
   firebase: {
-    apiKey: "",
-    authDomain: "",
-    projectId: "",
-    storageBucket: "",
-    messagingSenderId: "",
-    appId: ""
+    apiKey: "AIzaSyAVy8vZn8rw2ao5QIR059m3hM9RFDrrKGo",
+    authDomain: "tlv-final-accounts.firebaseapp.com",
+    projectId: "tlv-final-accounts",
+    storageBucket: "tlv-final-accounts.firebasestorage.app",
+    messagingSenderId: "264332755965",
+    appId: "1:264332755965:web:4501841bddf53cb9d50f94"
   },
   // App Check (reCAPTCHA v3 site key) – נדרש לקריאה האוטומטית דרך Firebase AI Logic
   recaptchaSiteKey: "",
@@ -168,7 +168,7 @@ window.FA_BACKEND = (async () => {
   } catch (e) { console.warn("AI Logic", e); }
   return { mode: "firebase", db: dbA, sample, auth: {
     onChange: cb => au.onAuthStateChanged(auth, cb),
-    signIn: (e, p) => au.signInWithEmailAndPassword(auth, e, p),
+    anon: () => au.signInAnonymously(auth),
     signOut: () => au.signOut(auth),
     reset: e => au.sendPasswordResetEmail(auth, e)
   } };
@@ -458,7 +458,7 @@ function stats(){
 }
 function render(){
   const app=$('#app');
-  const top=S.view!=='login'&&S.view!=='boot';['#btnHome','#btnVat'].forEach(x=>$(x).hidden=!top);$('#btnOut').hidden=!(top&&S.user);$('#who').textContent=S.user?S.user.email:'';
+  const top=S.view!=='login'&&S.view!=='boot';['#btnHome','#btnVat'].forEach(x=>$(x).hidden=!top);$('#btnOut').hidden=true;
   if(S.view==='boot'){app.innerHTML='<p class="muted">טוען…</p>';return}
   if(S.view==='login'){app.innerHTML=loginView();bindLogin();return}
   if(S.view==='list'){app.innerHTML=listView();bindList();return}
@@ -474,12 +474,10 @@ function render(){
   app.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;render()});
   ({read:bindRead,proj:bindProj,rows:bindRows,cls:bindCls,exp:bindExp})[S.tab]();
 }
-function loginView(){return `<div style="max-width:380px;margin:8vh auto"><h2>כניסה</h2><p class="muted">כניסה עם משתמש שנפתח עבורך במערכת.</p>
-  <form id="lf" class="chk"><input id="le" type="email" placeholder="דוא&quot;ל" autocomplete="username" required><input id="lp" type="password" placeholder="סיסמה" autocomplete="current-password" required>
-  <button class="pri" type="submit">כניסה</button><button type="button" class="ghost" id="lr">שכחתי סיסמה</button><div id="lm" class="small" style="background:none;padding:0"></div></form></div>`}
-function bindLogin(){const m=$('#lm');
-  $('#lf').onsubmit=async e=>{e.preventDefault();m.textContent='מתחבר…';try{await S.auth.signIn($('#le').value.trim(),$('#lp').value)}catch(x){m.textContent=/invalid|wrong|not-found|credential/.test(x.code||'')?'דוא"ל או סיסמה שגויים':'הכניסה נכשלה: '+(x.code||x.message)}};
-  $('#lr').onclick=async()=>{const e=$('#le').value.trim();if(!e){m.textContent='הקלידו דוא"ל ואז לחצו שוב';return}try{await S.auth.reset(e);m.textContent='נשלח מייל לאיפוס סיסמה'}catch(x){m.textContent='לא ניתן לשלוח: '+(x.code||x.message)}}}
+function loginView(){return `<div style="max-width:560px;margin:8vh auto" class="drop"><h3>לא ניתן להתחבר למסד הנתונים</h3>
+  <p class="muted">יש להפעיל ב-Firebase: Authentication › Sign-in method › <b>Anonymous</b>.</p><p class="small muted">${esc(S.authErr||'')}</p>
+  <button class="pri" onclick="location.reload()">נסו שוב</button></div>`}
+function bindLogin(){}
 function listView(){
   const q=S.q.trim();const ps=S.projects.filter(p=>!q||[p.name,p.num,p.company].join(' ').includes(q));
   return `<div class="row" style="justify-content:space-between;margin-bottom:14px"><div><h2>פרויקטים</h2><p class="muted" style="margin:0">כל חשבון סופי הוא פרויקט: מעלים את הדוח, בודקים, מסווגים ומפיקים אקסל.</p></div>
@@ -679,7 +677,6 @@ $('#btnHome').onclick=async()=>{if(dirty)await save();S.view='list';S.P=null;ren
 $('#btnVat').onclick=vatDialog;
 window.addEventListener('beforeunload',e=>{if(dirty){save();e.preventDefault()}});
 /* ---------- start ---------- */
-$('#btnOut').onclick=async()=>{if(dirty)await save();S.P=null;await S.auth.signOut()};
 S.view='boot';render();
 S.dl={save:async({filename,data})=>{const u=URL.createObjectURL(data instanceof Blob?data:new Blob([data]));const a=document.createElement('a');a.href=u;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000);return {status:'saved'}}};
 (async()=>{
@@ -687,7 +684,12 @@ S.dl={save:async({filename,data})=>{const u=URL.createObjectURL(data instanceof 
   let BE;try{BE=(await window.FA_BACKEND)||{mode:'local'}}catch(e){console.error(e);BE={mode:'local'};toast('החיבור ל-Firebase נכשל – עובדים במצב מקומי')}
   if(BE.mode==='firebase'){
     S.sample=BE.sample;S.auth=BE.auth;
-    BE.auth.onChange(async u=>{S.user=u||null;if(u){S.db=BE.db;S.view='boot';render();await loadAll();S.view='list'}else{S.db=null;S.view='login'}render()});
+    let tried=false;
+    BE.auth.onChange(async u=>{
+      if(u){S.db=BE.db;S.view='boot';render();await loadAll();S.view='list';render();return}
+      if(tried)return;tried=true;
+      try{await BE.auth.anon()}catch(x){S.view='login';S.authErr=x.code||x.message;render()}
+    });
   }else{S.view='list';await loadAll();render()}
 })();
 }
