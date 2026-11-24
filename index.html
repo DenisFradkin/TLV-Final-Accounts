@@ -254,29 +254,30 @@ function buildLines(P,grouped){
 function buildWB(ExcelJS,P,opt){
   opt=opt||{};const vat=(opt.vat||18)/100;
   const wb=new ExcelJS.Workbook();wb.creator='בדיקת חשבונות סופיים';
-  const ws=wb.addWorksheet('ניתוח עלויות',{views:[{rightToLeft:true,showGridLines:false}],pageSetup:{paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0}});
-  ws.columns=[{width:7},{width:17},{width:9},{width:40},{width:26},{width:20},{width:16},{width:16},{width:13},{width:13},{width:36},{width:12}];
+  const ws=wb.addWorksheet('ניתוח עלויות',{views:[{rightToLeft:true,showGridLines:false}],pageSetup:{paperSize:8,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:0,horizontalCentered:true,margins:{left:0.71,right:0.71,top:0.75,bottom:0.75,header:0.31,footer:0.31}},headerFooter:{oddFooter:'&C עמוד &P מתוך &N'}});
+  ws.columns=[{width:9},{width:16},{width:9},{width:42},{width:27},{width:22},{width:18},{width:18},{width:13},{width:13},{width:44},{width:15}];
   const FN='David',thin={style:'thin',color:{argb:'FF8C969F'}},box={top:thin,left:thin,bottom:thin,right:thin};
   const fill=c=>({type:'pattern',pattern:'solid',fgColor:{argb:c}});
-  const C=(a,v,s)=>{const c=ws.getCell(a);c.value=v;c.font={name:FN,size:12,...(s&&s.font||{})};c.alignment={vertical:'middle',horizontal:(s&&s.h)||'right',wrapText:true,readingOrder:'rtl'};if(s&&s.fill)c.fill=fill(s.fill);if(s&&s.fmt)c.numFmt=s.fmt;if(!(s&&s.nob))c.border=box;return c};
-  const NUM='#,##0',PCT='0.00%',HEAD='FFD9E2EA',SEC='FFEEF2F5',TOT='FFFFF2CC',BIG='FFB8F5D0';
+  const C=(a,v,s)=>{const c=ws.getCell(a);c.value=v;c.font={name:FN,size:13,...(s&&s.font||{})};c.alignment={vertical:'middle',horizontal:(s&&s.h)||'right',wrapText:true,readingOrder:'rtl'};if(s&&s.fill)c.fill=fill(s.fill);if(s&&s.fmt)c.numFmt=s.fmt;if(!(s&&s.nob))c.border=box;return c};
+  const NUM='#,##0',PCT='0.00%',HEAD='FFDDEBF7',SEC='FFDDEBF7',TOT='FFFCE4D6',BIG='FFB4C6E7',ROW='FFF2F2F2';
+  const paint=(row,c1,c2,f)=>{for(let c=c1.charCodeAt(0);c<=c2.charCodeAt(0);c++){const x=ws.getCell(String.fromCharCode(c)+row);x.fill=fill(f)}};
   const L=buildLines(P,opt.grouped!==false);
   const upd=new Date(P.updatedAt||Date.now());
   if(opt.logo&&/^data:image\/(png|jpe?g);base64,/.test(opt.logo)){try{const m=opt.logo.match(/^data:image\/(png|jpe?g);base64,(.*)$/);const id=wb.addImage({base64:m[2],extension:m[1]==='png'?'png':'jpeg'});ws.getRow(1).height=30;ws.getRow(2).height=30;ws.addImage(id,{tl:{col:0,row:0},ext:{width:70,height:70}})}catch(e){}}
-  C('L1','עדכון אחרון: '+fmtDT(upd),{font:{size:10,italic:true},h:'left',nob:true});
+  C('L1','עדכון אחרון: '+fmtDT(upd),{h:'left',nob:true});
   ws.mergeCells('A3:L3');
-  C('A3',`פרויקט מס' ${P.num||'—'} - ${P.name||''} - טבלת חישוב עלויות על בסיס חשבון סופי${P.finalDate?' מתאריך '+fmtD(P.finalDate):''}`,{font:{size:16,bold:true},h:'center',nob:true});
+  C('A3',`פרויקט מס' ${P.num||'—'} - ${P.name||''} - טבלת חישוב עלויות על בסיס חשבון סופי${P.finalDate?' מתאריך '+fmtD(P.finalDate):''}`,{font:{bold:true},h:'center',nob:true});
   ws.getRow(3).height=26;
   const hdr=['מס"ד','פרק','מס"ד שניוני','תאור','תפקיד בפרויקט','שיוך','ערך\\ עלות ללא מע"מ','ערך\\ עלות כולל מע"מ','אחוז מעלות הפרויקט (PRICE)','אחוז מעלות הביצוע (COST)','הערות','תאריך'];
-  hdr.forEach((h,i)=>C(String.fromCharCode(65+i)+'5',h,{font:{bold:true},fill:HEAD,h:'center'}));ws.getRow(5).height=34;
+  hdr.forEach((h,i)=>C(String.fromCharCode(65+i)+'5',h,{font:{bold:true},fill:HEAD,h:'center'}));ws.getRow(5).height=60;
   let r=6;
-  const secTitle=t=>{ws.mergeCells(`A${r}:L${r}`);C(`A${r}`,t,{font:{bold:true,size:13},fill:SEC});r++};
+  const secTitle=t=>{ws.mergeCells(`A${r}:L${r}`);C(`A${r}`,t,{font:{bold:true},fill:SEC,h:'center'});ws.getRow(r).height=30;r++};
   secTitle('נתונים כלליים');
   const gen=[['שם הפרויקט',P.name],['תיאור הפרויקט (תכולה)',P.desc],['שטח בניה עפ"י היתר (מ"ר)',P.area?+P.area:''],['חברה מבצעת',P.company],['מנהל פרויקט הנדסי',P.pm],['תאריך חשבון סופי',P.finalDate],['תאריך מסירה',P.deliveryDate],['מדד תשומות הבנייה עפ"י תאריך החשבון הסופי',P.index?+P.index:'']];
   const g0=r;let areaRow=0;
   gen.forEach((g,i)=>{let v=g[1]==null?'':g[1];let fmt;if(i===5||i===6){const m=String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);if(m){v=new Date(Date.UTC(+m[1],+m[2]-1,+m[3]));fmt='dd/mm/yyyy'}}if(i===2){areaRow=r;fmt='#,##0.00'}
-    C(`C${r}`,'1.'+(i+1),{h:'center'});C(`D${r}`,g[0]);ws.mergeCells(`E${r}:J${r}`);C(`E${r}`,v,{fmt});C(`K${r}`,'');r++});
-  ws.mergeCells(`A${g0}:A${r-1}`);C(`A${g0}`,1,{h:'center'});ws.mergeCells(`B${g0}:B${r-1}`);C(`B${g0}`,'נתונים כלליים',{h:'center'});
+    C(`C${r}`,'1.'+(i+1),{h:'center',font:{bold:true}});C(`D${r}`,g[0],{font:{bold:true}});ws.mergeCells(`E${r}:J${r}`);C(`E${r}`,v,{fmt,h:'center',font:{bold:true}});C(`K${r}`,'');C(`L${r}`,'');paint(r,'C','L',ROW);ws.getRow(r).height=i===1&&String(v).length>60?48:30;r++});
+  ws.mergeCells(`A${g0}:A${r-1}`);C(`A${g0}`,1,{h:'center',font:{bold:true}});ws.mergeCells(`B${g0}:B${r-1}`);C(`B${g0}`,'נתונים כלליים',{h:'center',font:{bold:true}});
   const pctCells=[];const T={};
   const secDef=[['exec',2,'עלויות ביצוע (COST)','ביצוע'],['plan',3,'עלויות תכנון','תכנון'],['mgmt',4,'עלויות ניהול ופיקוח','ניהול ופיקוח הנדסי'],['fee',5,'עמלת חברה עירונית','ניהול כולל של הפרויקט'],['levy',6,'אגרות, היטלים, מעבדות, מכון בקרה וכד\'','אגרות וכו\'']];
   const sums={};
@@ -285,30 +286,31 @@ function buildWB(ExcelJS,P,opt){
     const lines=L[k].length?L[k]:[{sup:'—',svc:'',excl:0,incl:0,note:'אין שורות בפרק'}];
     const s0=r;let se=0,si=0;
     lines.forEach((l,i)=>{C(`C${r}`,`${no}.${i+1}`,{h:'center'});C(`D${r}`,l.sup||'');C(`E${r}`,l.svc||'');C(`F${r}`,flab);
-      C(`G${r}`,Math.round((+l.excl||0)*100)/100,{fmt:NUM,h:'left'});C(`H${r}`,Math.round((+l.incl||0)*100)/100,{fmt:NUM,h:'left'});
-      C(`I${r}`,null,{fmt:PCT,h:'left'});C(`J${r}`,null,{fmt:PCT,h:'left'});C(`K${r}`,l.note||'',{font:{size:10}});
+      C(`G${r}`,Math.round((+l.excl||0)*100)/100,{fmt:NUM,h:'center'});C(`H${r}`,Math.round((+l.incl||0)*100)/100,{fmt:NUM,h:'center'});
+      C(`I${r}`,null,{fmt:PCT,h:'center'});C(`J${r}`,null,{fmt:PCT,h:'center'});C(`K${r}`,l.note||'');
       {const m=String(l.date||'').match(/^(\d{4})-(\d{2})-(\d{2})/);C(`L${r}`,m?new Date(Date.UTC(+m[1],+m[2]-1,+m[3])):'',{fmt:'dd/mm/yyyy',h:'center'})}
+      paint(r,'C','L',ROW);ws.getRow(r).height=String(l.sup||'').length>38||String(l.svc||'').length>24?48:30;
       pctCells.push([r,+l.incl||0]);se+=+l.excl||0;si+=+l.incl||0;r++});
-    ws.mergeCells(`A${s0}:A${r-1}`);C(`A${s0}`,no,{h:'center'});ws.mergeCells(`B${s0}:B${r-1}`);C(`B${s0}`,title,{h:'center'});
+    ws.mergeCells(`A${s0}:A${r-1}`);C(`A${s0}`,no,{h:'center',font:{bold:true}});ws.mergeCells(`B${s0}:B${r-1}`);C(`B${s0}`,title,{h:'center',font:{bold:true}});
     ws.mergeCells(`A${r}:F${r}`);C(`A${r}`,'סה"כ '+title,{font:{bold:true},fill:TOT});
-    C(`G${r}`,{formula:`SUM(G${s0}:G${r-1})`,result:se},{fmt:NUM,font:{bold:true},fill:TOT,h:'left'});
-    C(`H${r}`,{formula:`SUM(H${s0}:H${r-1})`,result:si},{fmt:NUM,font:{bold:true},fill:TOT,h:'left'});
-    C(`I${r}`,null,{fmt:PCT,font:{bold:true},fill:TOT,h:'left'});C(`J${r}`,null,{fmt:PCT,font:{bold:true},fill:TOT,h:'left'});C(`K${r}`,'',{fill:TOT});
+    C(`G${r}`,{formula:`SUM(G${s0}:G${r-1})`,result:se},{fmt:NUM,font:{bold:true},fill:TOT,h:'center'});
+    C(`H${r}`,{formula:`SUM(H${s0}:H${r-1})`,result:si},{fmt:NUM,font:{bold:true},fill:TOT,h:'center'});
+    C(`I${r}`,null,{fmt:PCT,font:{bold:true},fill:TOT,h:'center'});C(`J${r}`,null,{fmt:PCT,font:{bold:true},fill:TOT,h:'center'});C(`K${r}`,'',{fill:TOT});C(`L${r}`,'',{fill:TOT});ws.getRow(r).height=30;
     T[k]={row:r,s0,s1:r-1};sums[k]={e:se,i:si};r++;
   });
   const ovE=sums.plan.e+sums.mgmt.e+sums.fee.e+sums.levy.e,ovI=sums.plan.i+sums.mgmt.i+sums.fee.i+sums.levy.i;
   const totE=sums.exec.e+ovE,totI=sums.exec.i+ovI;
   const ovR=r;ws.mergeCells(`A${r}:F${r}`);C(`A${r}`,'סה"כ תקורות (תכנון, ניהול, פיקוח, אגרות, היטלים ועמלה)',{font:{bold:true},fill:TOT});
   const ovs=['plan','mgmt','fee','levy'].map(k=>T[k].row);
-  C(`G${r}`,{formula:ovs.map(x=>'G'+x).join('+'),result:ovE},{fmt:NUM,font:{bold:true},fill:TOT,h:'left'});
-  C(`H${r}`,{formula:ovs.map(x=>'H'+x).join('+'),result:ovI},{fmt:NUM,font:{bold:true},fill:TOT,h:'left'});
-  C(`I${r}`,{formula:ovs.map(x=>'I'+x).join('+'),result:totI?ovI/totI:0},{fmt:PCT,font:{bold:true},fill:TOT,h:'left'});
-  C(`J${r}`,{formula:ovs.map(x=>'J'+x).join('+'),result:sums.exec.i?ovI/sums.exec.i:0},{fmt:PCT,font:{bold:true},fill:TOT,h:'left'});C(`K${r}`,'',{fill:TOT});r++;
-  const prR=r;ws.mergeCells(`A${r}:F${r}`);C(`A${r}`,'סה"כ עלות הפרויקט (PRICE)',{font:{bold:true,size:13},fill:BIG});
-  C(`G${r}`,{formula:`G${T.exec.row}+G${ovR}`,result:totE},{fmt:NUM,font:{bold:true},fill:BIG,h:'left'});
-  C(`H${r}`,{formula:`H${T.exec.row}+H${ovR}`,result:totI},{fmt:NUM,font:{bold:true},fill:BIG,h:'left'});
-  C(`I${r}`,{formula:`I${T.exec.row}+I${ovR}`,result:totI?1:0},{fmt:PCT,font:{bold:true},fill:BIG,h:'left'});
-  C(`J${r}`,{formula:`J${T.exec.row}+J${ovR}`,result:sums.exec.i?totI/sums.exec.i:0},{fmt:PCT,font:{bold:true},fill:BIG,h:'left'});C(`K${r}`,'',{fill:BIG});r++;
+  C(`G${r}`,{formula:ovs.map(x=>'G'+x).join('+'),result:ovE},{fmt:NUM,font:{bold:true},fill:TOT,h:'center'});
+  C(`H${r}`,{formula:ovs.map(x=>'H'+x).join('+'),result:ovI},{fmt:NUM,font:{bold:true},fill:TOT,h:'center'});
+  C(`I${r}`,{formula:ovs.map(x=>'I'+x).join('+'),result:totI?ovI/totI:0},{fmt:PCT,font:{bold:true},fill:TOT,h:'center'});
+  C(`J${r}`,{formula:ovs.map(x=>'J'+x).join('+'),result:sums.exec.i?ovI/sums.exec.i:0},{fmt:PCT,font:{bold:true},fill:TOT,h:'center'});C(`K${r}`,'',{fill:TOT});C(`L${r}`,'',{fill:TOT});ws.getRow(r).height=30;r++;
+  const prR=r;ws.mergeCells(`A${r}:F${r}`);C(`A${r}`,'סה"כ עלות הפרויקט (PRICE)',{font:{bold:true},fill:BIG});
+  C(`G${r}`,{formula:`G${T.exec.row}+G${ovR}`,result:totE},{fmt:NUM,font:{bold:true},fill:BIG,h:'center'});
+  C(`H${r}`,{formula:`H${T.exec.row}+H${ovR}`,result:totI},{fmt:NUM,font:{bold:true},fill:BIG,h:'center'});
+  C(`I${r}`,{formula:`I${T.exec.row}+I${ovR}`,result:totI?1:0},{fmt:PCT,font:{bold:true},fill:BIG,h:'center'});
+  C(`J${r}`,{formula:`J${T.exec.row}+J${ovR}`,result:sums.exec.i?totI/sums.exec.i:0},{fmt:PCT,font:{bold:true},fill:BIG,h:'center'});C(`K${r}`,'',{fill:BIG});C(`L${r}`,'',{fill:BIG});ws.getRow(r).height=32;r++;
   const xr=T.exec.row,pr=prR;
   const pctF=(row,v)=>{ws.getCell(`I${row}`).value={formula:`IFERROR(H${row}/$H$${pr},0)`,result:totI?v/totI:0};ws.getCell(`J${row}`).value={formula:`IFERROR(H${row}/$H$${xr},0)`,result:sums.exec.i?v/sums.exec.i:0}};
   pctCells.forEach(([row,v])=>pctF(row,v));
@@ -316,11 +318,11 @@ function buildWB(ExcelJS,P,opt){
   r++;secTitle('ריכוז נתונים');
   const sm=[['סה"כ עלויות ביצוע (COST)',xr,sums.exec],['סה"כ עלויות תכנון',T.plan.row,sums.plan],['סה"כ עלויות ניהול ופיקוח',T.mgmt.row,sums.mgmt],['סה"כ עמלת חברה עירונית',T.fee.row,sums.fee],['סה"כ אגרות, היטלים, מעבדות, מכון בקרה וכד\'',T.levy.row,sums.levy],['סה"כ תקורות (תכנון, ניהול, פיקוח, אגרות, היטלים ועמלה)',ovR,{e:ovE,i:ovI}],['סה"כ עלות הפרויקט (PRICE)',prR,{e:totE,i:totI}]];
   const z0=r;
-  sm.forEach(([t,src,v],i)=>{const last=i===sm.length-1;const st=last?{font:{bold:true},fill:BIG}:{};
+  sm.forEach(([t,src,v],i)=>{const last=i===sm.length-1;const st=last?{font:{bold:true},fill:BIG}:{font:{bold:true},fill:TOT};
     C(`C${r}`,'7.'+(i+1),{h:'center',...st});ws.mergeCells(`D${r}:F${r}`);C(`D${r}`,t,st);
-    C(`G${r}`,{formula:`G${src}`,result:v.e},{fmt:NUM,h:'left',...st});C(`H${r}`,{formula:`H${src}`,result:v.i},{fmt:NUM,h:'left',...st});
-    C(`I${r}`,{formula:`I${src}`,result:totI?v.i/totI:0},{fmt:PCT,h:'left',...st});C(`J${r}`,{formula:`J${src}`,result:sums.exec.i?v.i/sums.exec.i:0},{fmt:PCT,h:'left',...st});C(`K${r}`,'',st);r++});
-  ws.mergeCells(`A${z0}:A${r-1}`);C(`A${z0}`,7,{h:'center'});ws.mergeCells(`B${z0}:B${r-1}`);C(`B${z0}`,'ריכוז נתונים',{h:'center'});
+    C(`G${r}`,{formula:`G${src}`,result:v.e},{fmt:NUM,h:'center',...st});C(`H${r}`,{formula:`H${src}`,result:v.i},{fmt:NUM,h:'center',...st});
+    C(`I${r}`,{formula:`I${src}`,result:totI?v.i/totI:0},{fmt:PCT,h:'center',...st});C(`J${r}`,{formula:`J${src}`,result:sums.exec.i?v.i/sums.exec.i:0},{fmt:PCT,h:'center',...st});C(`K${r}`,'',st);C(`L${r}`,'',st);ws.getRow(r).height=30;r++});
+  ws.mergeCells(`A${z0}:A${r-1}`);C(`A${z0}`,7,{h:'center',font:{bold:true},fill:TOT});ws.mergeCells(`B${z0}:B${r-1}`);C(`B${z0}`,'ריכוז נתונים',{h:'center',font:{bold:true},fill:TOT});
   r++;secTitle('ניתוח נתונים - עלות מ"ר בניה');
   const h1=r;
   ['A','B','C'].forEach(c=>ws.mergeCells(`${c}${r}:${c}${r+1}`));ws.mergeCells(`D${r}:F${r+1}`);
@@ -339,25 +341,26 @@ function buildWB(ExcelJS,P,opt){
     ['עלות פיתוח המועמסת על 1 מ"ר בניה (₪/מ"ר)',{I:{formula:`${dc}*G${A3}`,result:d5},J:{formula:`I${A5}*${1+vat}`,result:d5i}},`הנחת עבודה - עלות מ"ר פיתוח ${dc} ₪/מ"ר`],
     ['עלות למ"ר בינוי בסיסי (₪/מ"ר)',{I:{formula:`I${A4}-I${A5}`,result:p4[2]-d5},J:{formula:`J${A4}-J${A5}`,result:p4[3]-d5i}},'עפ"י חישוב'],
     [`עלות למ"ר בינוי בסיסי בניכוי ב.נ.מ. ${Math.round((bnm-1)*100)}% (₪/מ"ר)`,{I:{formula:`I${A6}/${bnm}`,result:(p4[2]-d5)/bnm},J:{formula:`J${A6}/${bnm}`,result:(p4[3]-d5i)/bnm}},'עפ"י חישוב - נכון ליום אישור החשבון הסופי (לא מהוון)']];
-  L8.forEach(([t,vals,note],i)=>{C(`C${r}`,'8.'+(i+1),{h:'center'});ws.mergeCells(`D${r}:F${r}`);C(`D${r}`,t);
-    ['G','H','I','J'].forEach(c=>C(`${c}${r}`,vals[c]===undefined?null:vals[c],{fmt:i===2?'0.00':'#,##0',h:'left'}));C(`K${r}`,note,{font:{size:10}});r++});
-  ws.mergeCells(`A${a0}:A${r-1}`);C(`A${a0}`,8,{h:'center'});ws.mergeCells(`B${a0}:B${r-1}`);C(`B${a0}`,'עלות מ"ר בניה',{h:'center'});
+  L8.forEach(([t,vals,note],i)=>{C(`C${r}`,'8.'+(i+1),{h:'center',font:{bold:true}});ws.mergeCells(`D${r}:F${r}`);C(`D${r}`,t,{font:{bold:true}});
+    ['G','H','I','J'].forEach(c=>C(`${c}${r}`,vals[c]===undefined?null:vals[c],{fmt:i===2?'0.00':'#,##0',h:'center'}));C(`K${r}`,note);C(`L${r}`,'');ws.getRow(r).height=30;r++});
+  ws.mergeCells(`A${a0}:A${r-1}`);C(`A${a0}`,8,{h:'center',font:{bold:true}});ws.mergeCells(`B${a0}:B${r-1}`);C(`B${a0}`,'ניתוח נתונים - עלות מ"ר בניה בסיסי',{h:'center',font:{bold:true}});
+  ws.pageSetup.printArea=`A1:L${r-1}`;ws.pageSetup.printTitlesRow='5:5';
   /* detail sheet */
-  const d=wb.addWorksheet('פירוט שורות מהדוח',{views:[{rightToLeft:true,state:'frozen',ySplit:3}]});
-  d.columns=[{width:6},{width:7},{width:36},{width:26},{width:18},{width:15},{width:15},{width:9},{width:11},{width:8},{width:34},{width:12}];
-  const D=(a,v,s)=>{const c=d.getCell(a);c.value=v;c.font={name:FN,size:11,...(s&&s.font||{})};c.alignment={vertical:'middle',horizontal:(s&&s.h)||'right',wrapText:true};if(s&&s.fill)c.fill=fill(s.fill);if(s&&s.fmt)c.numFmt=s.fmt;c.border=box;return c};
-  d.getCell('L1').value='עדכון אחרון: '+fmtDT(upd);d.getCell('L1').font={name:FN,size:10,italic:true};
-  d.mergeCells('A1:H1');d.getCell('A1').value=`פירוט שורות כפי שנקלטו מהחשבון הסופי - ${P.name||''}`;d.getCell('A1').font={name:FN,size:14,bold:true};
+  const d=wb.addWorksheet('פירוט שורות מהדוח',{views:[{rightToLeft:true,state:'frozen',ySplit:3}],pageSetup:{paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,horizontalCentered:true},headerFooter:{oddFooter:'&C עמוד &P מתוך &N'}});
+  d.columns=[{width:6},{width:7},{width:36},{width:26},{width:18},{width:17},{width:17},{width:9},{width:11},{width:8},{width:34},{width:12}];
+  const D=(a,v,s)=>{const c=d.getCell(a);c.value=v;c.font={name:FN,size:13,...(s&&s.font||{})};c.alignment={vertical:'middle',horizontal:(s&&s.h)||'right',wrapText:true};if(s&&s.fill)c.fill=fill(s.fill);if(s&&s.fmt)c.numFmt=s.fmt;c.border=box;return c};
+  d.getCell('L1').value='עדכון אחרון: '+fmtDT(upd);d.getCell('L1').font={name:FN,size:13};
+  d.mergeCells('A1:H1');d.getCell('A1').value=`פירוט שורות כפי שנקלטו מהחשבון הסופי - ${P.name||''}`;d.getCell('A1').font={name:FN,size:13,bold:true};
   ['#','עמוד','שם ספק','סוג שירות','שיוך','ללא מע"מ','כולל מע"מ','מע"מ %','מחושב','נבדק','הערה','תאריך'].forEach((h,i)=>D(String.fromCharCode(65+i)+'3',h,{font:{bold:true},fill:HEAD,h:'center'}));
   let k=4;(P.rows||[]).forEach((x,i)=>{D('A'+k,i+1,{h:'center'});D('B'+k,x.page||'',{h:'center'});D('C'+k,x.sup||'');D('D'+k,x.svc||'');D('E'+k,CATS[x.cat]||'לא משויך',x.cat?{}:{fill:'FFFFD9D6'});
-    D('F'+k,+x.excl||0,{fmt:'#,##0.00',h:'left'});D('G'+k,+x.incl||0,{fmt:'#,##0.00',h:'left'});D('H'+k,x.rate!=null?x.rate+'%':'',{h:'center'});D('I'+k,x.calc==='excl'?'ללא מע"מ':x.calc==='incl'?'כולל מע"מ':'',{h:'center'});D('J'+k,x.ok?'✓':'',{h:'center'});D('K'+k,x.note||'');{const m=String(x.date||'').match(/^(\d{4})-(\d{2})-(\d{2})/);D('L'+k,m?new Date(Date.UTC(+m[1],+m[2]-1,+m[3])):'',{fmt:'dd/mm/yyyy',h:'center'})}k++});
+    D('F'+k,+x.excl||0,{fmt:'#,##0.00',h:'center'});D('G'+k,+x.incl||0,{fmt:'#,##0.00',h:'center'});D('H'+k,x.rate!=null?x.rate+'%':'',{h:'center'});D('I'+k,x.calc==='excl'?'ללא מע"מ':x.calc==='incl'?'כולל מע"מ':'',{h:'center'});D('J'+k,x.ok?'✓':'',{h:'center'});D('K'+k,x.note||'');{const m=String(x.date||'').match(/^(\d{4})-(\d{2})-(\d{2})/);D('L'+k,m?new Date(Date.UTC(+m[1],+m[2]-1,+m[3])):'',{fmt:'dd/mm/yyyy',h:'center'})}k++});
   const f1=4,f2=k-1;
   d.mergeCells(`A${k}:E${k}`);D('A'+k,'סה"כ שורות (ללא "לא לכלול")',{font:{bold:true},fill:TOT});
   const incl=(P.rows||[]).filter(x=>x.cat!=='skip');
-  D('F'+k,{formula:`SUMIF(E${f1}:E${f2},"<>לא לכלול",F${f1}:F${f2})`,result:incl.reduce((s,x)=>s+(+x.excl||0),0)},{fmt:'#,##0.00',font:{bold:true},fill:TOT,h:'left'});
-  D('G'+k,{formula:`SUMIF(E${f1}:E${f2},"<>לא לכלול",G${f1}:G${f2})`,result:incl.reduce((s,x)=>s+(+x.incl||0),0)},{fmt:'#,##0.00',font:{bold:true},fill:TOT,h:'left'});k++;
-  if(P.reportIncl||P.reportExcl){d.mergeCells(`A${k}:E${k}`);D('A'+k,'סה"כ לפי הדוח',{font:{bold:true}});D('F'+k,+P.reportExcl||null,{fmt:'#,##0.00',h:'left'});D('G'+k,+P.reportIncl||null,{fmt:'#,##0.00',h:'left'});k++;
-    d.mergeCells(`A${k}:E${k}`);D('A'+k,'הפרש',{font:{bold:true}});D('F'+k,P.reportExcl?{formula:`F${k-2}-F${k-1}`}:null,{fmt:'#,##0.00',h:'left'});D('G'+k,P.reportIncl?{formula:`G${k-2}-G${k-1}`}:null,{fmt:'#,##0.00',h:'left'})}
+  D('F'+k,{formula:`SUMIF(E${f1}:E${f2},"<>לא לכלול",F${f1}:F${f2})`,result:incl.reduce((s,x)=>s+(+x.excl||0),0)},{fmt:'#,##0.00',font:{bold:true},fill:TOT,h:'center'});
+  D('G'+k,{formula:`SUMIF(E${f1}:E${f2},"<>לא לכלול",G${f1}:G${f2})`,result:incl.reduce((s,x)=>s+(+x.incl||0),0)},{fmt:'#,##0.00',font:{bold:true},fill:TOT,h:'center'});k++;
+  if(P.reportIncl||P.reportExcl){d.mergeCells(`A${k}:E${k}`);D('A'+k,'סה"כ לפי הדוח',{font:{bold:true}});D('F'+k,+P.reportExcl||null,{fmt:'#,##0.00',h:'center'});D('G'+k,+P.reportIncl||null,{fmt:'#,##0.00',h:'center'});k++;
+    d.mergeCells(`A${k}:E${k}`);D('A'+k,'הפרש',{font:{bold:true}});D('F'+k,P.reportExcl?{formula:`F${k-2}-F${k-1}`}:null,{fmt:'#,##0.00',h:'center'});D('G'+k,P.reportIncl?{formula:`G${k-2}-G${k-1}`}:null,{fmt:'#,##0.00',h:'center'})}
   return wb;
 }
 /* ===== END EXPORT ===== */
@@ -956,14 +959,14 @@ function bindSheet(){
   document.querySelectorAll('[data-scan]').forEach(b=>b.onclick=()=>{const i=S.pages.findIndex(p=>p.n==b.dataset.scan);if(i>=0){S.pageSel=i;S.scanOpen=true;render()}});
   const as=$('#accSug');if(as)as.onclick=()=>{const seen=new Set();S.P.rows.forEach(r=>{if(r.cat&&r.cat!=='skip'&&(r.catSrc==='rule'||r.catSrc==='ai')){r.catSrc='user';const k=gkey(r);if(!seen.has(k)){seen.add(k);rememberSupplier(r,r.cat)}}});S.pvOk=false;touch();render()};
   $('#addRow').onclick=()=>{S.P.rows.push({id:uid(),ord:S.P.rows.reduce((m,r)=>Math.max(m,r.ord||0),0)+1,sup:'',svc:'',date:'',excl:null,incl:null,rate:null,calc:'',page:null,note:'',ok:false,src:'manual',cat:''});S.expGrouped=false;S.pvIssues=false;touch();render();const t=document.querySelector('#pv tbody tr[data-ids] [data-lf=sup]');if(t){t.scrollIntoView({block:'center'});t.focus()}};
-  document.querySelectorAll('#pv [data-okline]').forEach(b=>b.onclick=()=>{const ids=b.closest('tr').dataset.ids.split(',');const rs=S.P.rows.filter(r=>ids.includes(r.id));rs.forEach(r=>{r.ok=true;r.flag=false;r.vatOk=true;r.dupOk=true;if(r.catSrc==='rule'||r.catSrc==='ai')r.catSrc='user'});if(rs[0]&&rs[0].cat&&rs[0].cat!=='skip')rememberSupplier(rs[0],rs[0].cat);S.pvOk=false;touch();rr()});
+  document.querySelectorAll('#pv [data-okline]').forEach(b=>b.onclick=()=>{const ids=b.closest('tr').dataset.ids.split(',');const rs=S.P.rows.filter(r=>ids.includes(r.id));rs.forEach(r=>{r.ok=true;r.flag=false;r.vatOk=true;r.dupOk=true;if(r.catSrc==='rule'||r.catSrc==='ai')r.catSrc='user'});if(rs[0]&&rs[0].cat&&rs[0].cat!=='skip'){rememberSupplier(rs[0],rs[0].cat);propToast(propagateCat(rs[0],rs[0].cat,true),rs[0].sup)}S.pvOk=false;touch();rr()});
   document.querySelectorAll('#pv [data-delline]').forEach(b=>b.onclick=()=>{const id=b.closest('tr').dataset.ids;const i=S.P.rows.findIndex(r=>r.id===id);if(i<0)return;const r=S.P.rows.splice(i,1)[0];S.pvOk=false;touch();rr();toast('השורה נמחקה',[['ביטול',()=>{S.P.rows.splice(i,0,r);touch();render()}]])});
   document.querySelectorAll('#pv [data-pf]').forEach(i=>i.onchange=()=>{const k=i.dataset.pf;let v=i.value.trim();if(/area|index|devArea|devCost|bnm|report/.test(k))v=num(v);S.P[k]=v;if(S.P.src&&!/devArea|devCost|bnm|report/.test(k))S.P.src[k]=v===''||v==null?'':'manual';S.pvOk=false;touch();rr()});
   document.querySelectorAll('#pv tr[data-ids]').forEach(tr=>{const rows=tr.dataset.ids.split(',').map(id=>S.P.rows.find(r=>r.id===id)).filter(Boolean);
     tr.querySelectorAll('[data-lf]').forEach(i=>i.onchange=()=>{const k=i.dataset.lf,v=i.value;
       if(k==='sup'||k==='svc'||k==='date')rows.forEach(r=>r[k]=v.trim());
       else if(k==='note')rows.forEach((r,j)=>r.note=j?'':v.trim());
-      else if(k==='cat'){rows.forEach(r=>{r.cat=v;r.catSrc='user'});if(v&&v!=='skip')rememberSupplier(rows[0],v)}
+      else if(k==='cat'){rows.forEach(r=>{r.cat=v;r.catSrc='user'});if(v&&v!=='skip')rememberSupplier(rows[0],v);if(v){let n=0;const seen=new Set();rows.forEach(r=>{const kk=supKey(r.sup);if(seen.has(kk))return;seen.add(kk);n+=propagateCat(r,v,false)});propToast(n,rows[0].sup)}}
       else if(k==='excl'||k==='incl'){const r=rows[0],o=k==='excl'?'incl':'excl';r[k]=num(v);r.flag=false;if(r.calc===o||r[o]==null){r.calc=o;fixVat(r)}else if(r.calc===k)r.calc=''}
       if((k==='sup'||k==='svc')&&rows[0]&&!rows[0].cat){const s=suggest(rows[0]);if(s.cat){rows.forEach(r=>{r.cat=s.cat;r.catSrc=s.src})}}
       S.pvOk=false;touch();rr()})});
@@ -974,6 +977,14 @@ function bindSheet(){
       await S.dl.save({filename:fn,data:new Blob([buf])});P.exportedAt=Date.now();P.updatedAt=P.exportedAt;dirty=true;await save();render();toast('הקובץ ירד למחשב')}
     catch(e){if(e&&e.code==='declined')return;toast('ההפקה לא הושלמה'+(e&&e.message?': '+e.message:''))}};
 }
+/* same supplier name -> same chapter in the whole project */
+const supKey=x=>normName(x).replace(/\s+/g,'');
+function propagateCat(src,cat,onlyOpen){
+  const k=supKey(src.sup);if(!k)return 0;const prev=[];
+  S.P.rows.forEach(r=>{if(r===src||supKey(r.sup)!==k||r.cat===cat)return;if(onlyOpen&&r.cat&&r.catSrc==='user')return;prev.push([r,r.cat,r.catSrc]);r.cat=cat;r.catSrc='user'});
+  if(prev.length)S.lastProp=prev;return prev.length;
+}
+function propToast(n,sup){if(!n)return;toast(`הפרק עודכן גם ב-${n} שורות נוספות של "${sup}"`,[['ביטול',()=>{(S.lastProp||[]).forEach(([r,c,cs])=>{r.cat=c;r.catSrc=cs});S.lastProp=null;touch();render()}]])}
 /* ----- settings & backup ----- */
 function downloadJSON(obj,name){S.dl.save({filename:name,data:new Blob([JSON.stringify(obj,null,1)],{type:'application/json'})})}
 async function saveGen(){if(S.db){try{await S.db.doc('settings/general').set(JSON.parse(JSON.stringify(S.gen)))}catch(e){toast('השמירה נכשלה')}}else LS.set('gen',S.gen)}
