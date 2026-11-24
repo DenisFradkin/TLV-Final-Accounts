@@ -291,117 +291,143 @@ function buildWB(ExcelJS,P,opt){
   return wb;
 }
 /* ===== END EXPORT ===== */
-/* OCR → rows. Pure; works on tesseract.js v5 data.lines */
-function ocrParsePage(lines, rates){
-  rates = rates && rates.length ? rates : [17, 18];
-  const isNumTok = t => /\d/.test(t) && /^[\d.,\-₪()]+$/.test(t.replace(/[‎‏]/g, ''));
+/* ===== Generic OCR table: columns by position, roles by mapping (no format assumptions) ===== */
+const OT = (() => {
+  const clean = t => String(t || '').replace(/[‎‏]/g, '').trim();
   const toNum = t => {
-    let s = String(t).replace(/[^\d.,\-]/g, '');
-    if (!s || !/\d/.test(s)) return null;
-    if (/,\d{2}$/.test(s) && !/\.\d{2}$/.test(s)) s = s.replace(/,(\d{2})$/, '.$1');      // 1,500,00 → 1,500.00
+    let s = clean(t), neg = /^-|-$/.test(s.replace(/[\[\]|=<>{}()₪]/g, ''));
+    s = s.replace(/[^\d.,]/g, '');
+    if (!s || (s.match(/\d/g) || []).length < 1) return null;
+    if (/,\d{2}$/.test(s) && !/\.\d{2}$/.test(s)) s = s.replace(/,(\d{2})$/, '.$1');
     s = s.replace(/,/g, '');
-    if (/^\d{1,3}\.\d{3}$/.test(s)) s = s.replace('.', '');                                // 16.380 → 16380
-    const parts = s.split('.'); if (parts.length > 2) s = parts.slice(0, -1).join('') + '.' + parts[parts.length - 1];
-    const n = Number(s); return isNaN(n) ? null : n;
+    if (/^\d{1,3}\.\d{3}$/.test(s)) s = s.replace('.', '');
+    const p = s.split('.'); if (p.length > 2) s = p.slice(0, -1).join('') + '.' + p[p.length - 1];
+    const n = Number(s); return isNaN(n) ? null : (neg ? -n : n);
   };
-  const W = l => (l.words || []).map(w => ({ t: String(w.text || '').replace(/[‎‏]/g, '').trim(), c: w.confidence, x0: w.bbox.x0, x1: w.bbox.x1, y0: w.bbox.y0, y1: w.bbox.y1 })).filter(w => w.t);
-  const txt = ws => ws.slice().sort((a, b) => b.x0 - a.x0).map(w => w.t).join(' ');
-  const L = lines.map(l => { const ws = W(l); return { ws, text: txt(ws), y0: Math.min(...ws.map(w => w.y0)), y1: Math.max(...ws.map(w => w.y1)) }; }).filter(l => l.ws.length);
-  const out = { rows: [], project: {}, totalIncl: null, totalExcl: null, isTable: false };
-  const all = L.map(l => l.text).join('\n');
-  let m;
-  if ((m = all.match(/פרויקט[:\s]+(\d{2,6})\b/))) out.project.number = m[1];
-  if ((m = all.match(/תאריך\s*(?:דרישה|חשבון)?[^\n\d]{0,12}(\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4})/))) out.project.date = m[1];
-  const pi = L.findIndex(l => /^בפרויקט[:\s]/.test(l.text));
-  if (pi >= 0) { let nm = L[pi].text.replace(/^בפרויקט[:\s]*/, '').replace(/^-/, '').trim(); const nx = L[pi + 1]; if (nx && nx.ws.length <= 4 && !/[:]/.test(nx.text) && !/\d{3}/.test(nx.text)) nm += ' ' + nx.text; out.project.name = nm.trim(); }
-
-  const hi = L.findIndex(l => /ספק/.test(l.text) && /(שירות|סוג)/.test(l.text));
-  if (hi < 0) return out;
-  out.isTable = true;
-  const H = L[hi];
-  const svcW = H.ws.filter(w => /^(סוג|שירות)/.test(w.t));
-  const supW = H.ws.filter(w => /ספק|שם/.test(w.t));
-  const svcRight = Math.max(...svcW.map(w => w.x1));
-  const svcLeft = Math.min(...svcW.map(w => w.x0));
-  const supLeft = supW.length ? Math.min(...supW.map(w => w.x0)) : svcRight + 40;
-  const split = (svcRight + supLeft) / 2;
-  const numLeftEdge = svcLeft - 25;              // numbers live left of the service column
-  // header text below (second header line) within 45px
-  const hdr = [...H.ws]; const H2 = L[hi + 1]; if (H2 && H2.y0 - H.y1 < 45 && !H2.ws.some(w => isNumTok(w.t) && toNum(w.t) > 99)) hdr.push(...H2.ws);
-  const startData = hdr.length > H.ws.length ? hi + 2 : hi + 1;
-  // columns = clusters of the numbers' right edges (amounts are right-aligned)
-  const edges = [];
-  for (let i = startData; i < L.length; i++) L[i].ws.forEach(w => { if (w.x1 < numLeftEdge && isNumTok(w.t)) edges.push(w.x1); });
-  edges.sort((a, b) => a - b);
-  const cl = [];
-  edges.forEach(x => { const last = cl[cl.length - 1]; if (last && x - last.hi < 18) { last.hi = x; last.xs.push(x); } else cl.push({ hi: x, xs: [x] }); });
-  const C = cl.filter(c => c.xs.length >= 3).map(c => ({ r: c.xs[Math.floor(c.xs.length / 2)] }));
-  C.forEach((c, k) => { c.lo = k ? (C[k - 1].r + 12) : 0; c.hi = c.r + 12; });
-  C.forEach(c => { c.title = txt(hdr.filter(w => { const x = (w.x0 + w.x1) / 2; return x > c.lo && x <= c.hi + 30 && w.x1 < numLeftEdge + 20 && w.t !== '|'; })); });
-  const isExcl = t => /לפני/.test(t) || /ללא\s*מע/.test(t);
-  const isIncl = t => /מצטבר/.test(t) && /כולל/.test(t) && !/ללא/.test(t) && !/לפני/.test(t);
-  let iE = C.findIndex(c => isExcl(c.title)), iI = C.findIndex(c => isIncl(c.title));
-  const iPrev = C.findIndex(c => /מצטבר/.test(c.title) && /ללא/.test(c.title) && /דרישה/.test(c.title));
-  const iCur = C.findIndex(c => /דרישה/.test(c.title) && /נוכחית/.test(c.title) && !/מצטבר/.test(c.title));
-  if (iE < 0 && C.length) iE = 0;                 // leftmost column as fallback (RTL tables end with it)
-  if (iI < 0 && C.length > 1) iI = 1;
-  out.cols = C.map(c => c.title); out.iE = iE; out.iI = iI;
-  const fits = (e, i) => e > 0 && i > 0 && rates.some(r => Math.abs(i / e - (1 + r / 100)) < 0.0025);
-  const near = (a, b) => a != null && b != null && Math.abs(a - b) < 0.6;
-  for (let i = startData; i < L.length; i++) {
-    const l = L[i];
-    const cell = C.map(() => []);
-    const sup = [], svc = [];
-    l.ws.forEach(w => {
-      const x = (w.x0 + w.x1) / 2;
-      if (w.x1 < numLeftEdge && isNumTok(w.t)) { const k = C.findIndex(c => w.x1 > c.lo && w.x1 <= c.hi); if (k >= 0) cell[k].push(w); return; }
-      if (x > split) sup.push(w); else if (x > numLeftEdge - 10) svc.push(w);
+  // an amount-like token: digits with separators, no internal "/" or "-" (dates, phones, file numbers)
+  const isAmt = t => { const c = clean(t).replace(/[\[\]|=<>{}()₪]/g, ''); return /^-?[\d.,]*\d[\d.,]*-?$/.test(c) && (c.match(/\d/g) || []).length >= 3 && !/\d-\d|\//.test(c); };
+  const isMoney = t => isAmt(t) && /[.,]\d{2}-?$/.test(clean(t).replace(/[\[\]|=<>{}()₪]/g, ''));
+  const heb = t => (String(t).match(/[א-ת]/g) || []).length;
+  const words = (lines, imgW) => {
+    const F = imgW ? 1654 / imgW : 1;
+    return lines.map(l => {
+      const ws = (l.words || []).map(w => ({ t: clean(w.text), c: w.confidence, x0: w.bbox.x0 * F, x1: w.bbox.x1 * F, y0: w.bbox.y0 * F, y1: w.bbox.y1 * F })).filter(w => w.t && !/^[|\[\]=_]+$/.test(w.t));
+      return { ws, text: ws.slice().sort((a, b) => b.x0 - a.x0).map(w => w.t).join(' '), y0: Math.min(...ws.map(w => w.y0)), y1: Math.max(...ws.map(w => w.y1)) };
+    }).filter(l => l.ws.length);
+  };
+  function project(L) {
+    const all = L.map(l => l.text).join('\n'), p = {}; let m;
+    if ((m = all.match(/פרויקט[:\s]+(\d{2,6})\b/))) p.number = m[1];
+    if ((m = all.match(/תאריך\s*(?:דרישה|חשבון|חשבונית)?[^\n\d]{0,12}(\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4})/))) p.date = m[1];
+    const i = L.findIndex(l => /^(בפרויקט|פרויקט|הנדון)[:\s]/.test(l.text));
+    if (i >= 0) { const nm = L[i].text.replace(/^(בפרויקט|פרויקט|הנדון)[:\s]*/, '').replace(/^-/, '').trim(); if (nm && !/^\d+$/.test(nm)) p.name = nm; }
+    return p;
+  }
+  /* split the page's table into columns by where words fall across many rows */
+  function table(lines, imgW) {
+    const L = words(lines, imgW);
+    const out = { project: project(L), cols: [], rows: [], header: [] };
+    // the table = the densest vertical run of lines that carry money amounts
+    const mon = L.filter(l => l.ws.some(w => isMoney(w.t)) && l.ws.length >= 2);
+    if (mon.length < 2) return out;
+    const gaps = mon.slice(1).map((l, i) => l.y0 - mon[i].y0).sort((a, b) => a - b), med = gaps[Math.floor(gaps.length / 2)] || 30;
+    const blocks = [[mon[0]]]; mon.slice(1).forEach((l, i) => { if (l.y0 - mon[i].y0 > Math.max(3.2 * med, 60)) blocks.push([l]); else blocks[blocks.length - 1].push(l); });
+    const blk = blocks.reduce((a, b) => b.length > a.length ? b : a);
+    const yA = blk[0].y0 - 2, yB = blk[blk.length - 1].y1 + 2;
+    const cand = L.filter(l => l.y0 >= yA && l.y1 <= yB + med && l.ws.some(w => isAmt(w.t)) && l.ws.length >= 2);
+    if (cand.length < 2) return out;
+    const W = 1800, cov = new Uint16Array(W);
+    cand.forEach(l => l.ws.forEach(w => { for (let x = Math.max(0, Math.floor(w.x0)); x < Math.min(W, Math.ceil(w.x1)); x++) cov[x]++; }));
+    const th = Math.max(2, Math.ceil(cand.length * 0.12));
+    let segs = [], s = -1;
+    for (let x = 0; x <= W; x++) { const on = x < W && cov[x] >= th; if (on && s < 0) s = x; if (!on && s >= 0) { segs.push({ lo: s, hi: x }); s = -1; } }
+    for (let i = 1; i < segs.length; i++) if (segs[i].lo - segs[i - 1].hi < 7) { segs[i - 1].hi = segs[i].hi; segs.splice(i, 1); i--; }
+    if (!segs.length) return out;
+    segs.sort((a, b) => b.lo - a.lo);                       // right-to-left: first column is the rightmost
+    const pick = w => { const x = (w.x0 + w.x1) / 2; let k = segs.findIndex(g => x >= g.lo - 4 && x <= g.hi + 4); if (k < 0) { let d = 1e9; segs.forEach((g, i) => { const dd = Math.min(Math.abs(x - g.lo), Math.abs(x - g.hi)); if (dd < d) { d = dd; k = i; } }); } return k; };
+    const cellOf = (ws, numeric) => numeric ? ws.slice().sort((a, b) => a.x0 - b.x0).map(w => w.t).join('') : ws.slice().sort((a, b) => b.x0 - a.x0).map(w => w.t).join(' ');
+    const first = L.indexOf(cand[0]), rh = (cand[cand.length - 1].y1 - cand[0].y0) / Math.max(1, cand.length);
+    const head = []; for (let i = first - 1; i >= 0 && i >= first - 3; i--) { if (L[i].ws.some(w => isMoney(w.t)) || cand[0].y0 - L[i].y1 > 4 * rh) break; head.unshift(L[i]); }
+    const hdr = segs.map(() => []); head.forEach(l => l.ws.forEach(w => hdr[pick(w)].push(w)));
+    const grid = cand.map(l => { const c = segs.map(() => []); l.ws.forEach(w => c[pick(w)].push(w)); return { l, c }; });
+    out.cols = segs.map((g, k) => {
+      const cells = grid.map(r => r.c[k]).filter(c => c.length);
+      const numeric = cells.filter(c => c.every(w => isAmt(w.t) || /^[\d.,\-]+$/.test(w.t))).length;
+      const money = cells.filter(c => c.some(w => isMoney(w.t))).length;
+      const hb = cells.reduce((a, c) => a + heb(c.map(w => w.t).join('')), 0);
+      return { lo: g.lo, hi: g.hi, title: cellOf(hdr[k], false), filled: cells.length, money: cells.length ? money / cells.length : 0, numeric: cells.length ? numeric / cells.length : 0, heb: cells.length ? hb / cells.length : 0 };
     });
-    const val = k => { if (k < 0 || !cell[k].length) return { v: null, c: 0, multi: false }; const ws = cell[k].sort((a, b) => a.x0 - b.x0); const v = toNum(ws.map(w => w.t).join('')); return { v, c: Math.min(...ws.map(w => w.c)), multi: ws.length > 1 }; };
-    while (svc.length && /^בע["״]?מ$/.test(svc.slice().sort((a, b) => b.x0 - a.x0)[0].t)) { const f = svc.slice().sort((a, b) => b.x0 - a.x0)[0]; svc.splice(svc.indexOf(f), 1); sup.push(f); }
-    const supT = txt(sup).replace(/^[\\\/|,.°'"\-_ ]+/, '').trim(), svcT = txt(svc).replace(/[|_=\\\/}{]+/g, '').trim();
-    const nums = C.map((_, k) => val(k));
-    const filled = nums.filter(n => n.v != null).length;
-    if (/^סה["״']?[כב]\b|^סה["״']?[כב]$|סה["״'][כב]\s/.test(supT) || /^סה["״']?[כב]/.test(supT)) {
-      {
-        const e = nums[iE] && nums[iE].v, ic = nums[iI] && nums[iI].v;
-        if (e && ic && !/ללא|לפני|מע/.test(supT)) { out.totalExcl = e; out.totalIncl = ic; }
-        continue;
-      }
-    }
-    if (/תקציב|אחוז\s*ניצול|מאושר/.test(l.text)) continue;
-    if (filled < 1 || !supT) continue;
-    let e = nums[iE] ? nums[iE].v : null, inc = nums[iI] ? nums[iI].v : null;
-    let ok = fits(e, inc), fixed = '';
-    { const prev = iPrev >= 0 ? nums[iPrev].v : null, cur = iCur >= 0 ? nums[iCur].v : null;
-      if (inc != null && prev != null && cur != null && !near(prev + cur, inc) && near((prev + cur) * 100, inc)) { inc = Math.round(inc) / 100; if (e != null && fits(e / 100, inc)) e = Math.round(e) / 100; fixed = 'תוקנה נקודה עשרונית שלא זוהתה'; ok = fits(e, inc); } }
-    if (!ok && e != null && inc != null) {
-      for (const [de, di] of [[100, 100], [1, 100], [100, 1]]) if (fits(e / de, inc / di)) { e = Math.round(e / de * 100) / 100; inc = Math.round(inc / di * 100) / 100; ok = true; fixed = 'תוקנה נקודה עשרונית שלא זוהתה'; break; }
-    }
-    if (!ok) {
-      const prev = iPrev >= 0 ? nums[iPrev].v : null, cur = iCur >= 0 ? nums[iCur].v : null;
-      if (prev != null && (cur === 0 || cur == null) && fits(e, prev)) { inc = prev; ok = true; fixed = 'הסכום כולל מע"מ תוקן לפי עמודת המצטבר הקודם'; }
-      else {
-        let incT = null;
-        if (inc != null && prev != null && cur != null && near(prev + cur, inc)) incT = inc;
-        else if (prev != null && cur != null && (cur === 0) ) incT = prev;
-        if (incT != null) { inc = incT; e = null; fixed = 'הסכום ללא מע"מ לא זוהה בוודאות וחושב מהסכום כולל מע"מ'; }
-      }
-    }
-    const lowC = nums.some(n => n.v != null && n.c < 70) || nums.some(n => n.multi);
-    out.rows.push({ sup: supT, svc: svcT, excl: e, incl: inc, ok: ok && !lowC, note: fixed, conf: Math.round(Math.min(...[...sup, ...svc].map(w => w.c), 100)), y: l.y0 });
+    out.rows = grid.map(r => ({ y: r.l.y0, cells: r.c.map((ws, k) => ({ t: cellOf(ws, out.cols[k].numeric > 0.5), c: ws.length ? Math.min(...ws.map(w => w.c)) : 100 })) }));
+    out.header = out.cols.map(c => c.title);
+    return out;
   }
-  // a last row whose amount equals the sum of the rows above it is the table's total line
-  if (out.rows.length > 2) {
-    const last = out.rows[out.rows.length - 1];
-    const rest = out.rows.slice(0, -1).reduce((a, r) => a + (r.incl || 0), 0);
-    if (last.incl && Math.abs(last.incl - rest) / last.incl < 0.03 || (last.incl && out.rows.slice(0, -1).every(r => (r.incl || 0) < last.incl) && last.incl > 0.8 * rest)) {
-      out.rows.pop(); if (!out.totalIncl) { out.totalIncl = last.incl; out.totalExcl = last.excl; }
+  const sigOf = T => T.header.map(h => h.replace(/[^א-תa-z]/gi, '')).join('|');
+  const sim = (a, b) => { const A = new Set(a.split(/[|\s]+/).filter(Boolean)), B = new Set(b.split(/[|\s]+/).filter(Boolean)); if (!A.size || !B.size) return 0; let n = 0; A.forEach(x => { if (B.has(x)) n++; }); return n / Math.max(A.size, B.size); };
+  const fitsR = (e, i, rates) => e > 0 && i > 0 && rates.some(r => Math.abs(i / e - (1 + r / 100)) < 0.0025);
+  /* guess roles: a remembered template first, then the VAT ratio between two amount columns */
+  function guess(T, templates, rates) {
+    const n = T.cols.length, roles = Array(n).fill('');
+    const sig = sigOf(T);
+    let best = null, bs = 0;
+    (templates || []).forEach(t => { if (t.n !== n) return; const s = sim(t.sig, sig); if (s > bs) { bs = s; best = t; } });
+    if (best && bs >= 0.5) return { roles: best.roles.slice(), from: 'template' };
+    const amtCols = T.cols.map((c, k) => k).filter(k => T.cols[k].money >= 0.5);
+    const vals = k => T.rows.map(r => toNum(r.cells[k].t));
+    const P = [];
+    amtCols.forEach(a => amtCols.forEach(b => { if (a === b) return; const va = vals(a), vb = vals(b); let c = 0; va.forEach((x, i) => { if (fitsR(x, vb[i], rates)) c++; });
+      const t = T.cols[b].title, pref = (/כולל/.test(t) ? 1 : 0) - (/ללא|לפני/.test(t) ? 2 : 0);
+      P.push({ a, b, c, pref, sumB: vb.reduce((s, x) => s + (x || 0), 0) }); }));
+    const top = Math.max(0, ...P.map(p => p.c));
+    const pair = P.filter(p => p.c >= top * 0.75 && p.c > 0).sort((x, y) => y.pref - x.pref || y.c - x.c || y.sumB - x.sumB)[0] || null, pc = pair ? pair.c : 0;
+    if (pair && pc >= Math.max(2, T.rows.length * 0.3)) { roles[pair.a] = 'excl'; roles[pair.b] = 'incl'; }
+    else if (amtCols.length) {
+      const h = k => T.cols[k].title;
+      const ex = amtCols.find(k => /לפני|ללא\s*מע/.test(h(k))), inc = amtCols.find(k => /כולל\s*מע|כולל/.test(h(k)) && !/ללא|לפני/.test(h(k)));
+      if (ex != null) roles[ex] = 'excl';
+      if (inc != null && inc !== ex) roles[inc] = 'incl';
+      if (ex == null && inc == null) roles[amtCols.reduce((a, b) => T.cols[a].lo < T.cols[b].lo ? a : b)] = 'incl';   // leftmost amount
     }
+    const text = T.cols.map((c, k) => k).filter(k => !roles[k] && T.cols[k].heb >= 3 && T.cols[k].numeric < 0.5).sort((a, b) => T.cols[b].lo - T.cols[a].lo);
+    if (text[0] != null) roles[text[0]] = 'sup';
+    if (text[1] != null) roles[text[1]] = 'svc';
+    return { roles, from: 'guess' };
   }
-  if (out.totalIncl) out.rows.forEach(r => ['incl', 'excl'].forEach(f => { if (r[f] > out.totalIncl * 1.01 && r[f] / 100 <= out.totalIncl) { r[f] = Math.round(r[f]) / 100; r.ok = false; r.note = 'תוקנה נקודה עשרונית שלא זוהתה'; } }));
-  return out;
-}
+  /* turn mapped table rows into account rows, with checks and repairs */
+  function apply(T, roles, rates) {
+    const k = r => roles.indexOf(r), ks = roles.map((r, i) => r === 'svc' ? i : -1).filter(i => i >= 0);
+    const out = { rows: [], totalIncl: null, totalExcl: null };
+    T.rows.forEach(R => {
+      const sup = k('sup') >= 0 ? R.cells[k('sup')].t.replace(/^[\\\/|,.°'"\-_ ]+/, '').trim() : '';
+      const svc = ks.map(i => R.cells[i].t).filter(Boolean).join(' ').trim();
+      let e = k('excl') >= 0 ? toNum(R.cells[k('excl')].t) : null, inc = k('incl') >= 0 ? toNum(R.cells[k('incl')].t) : null;
+      const lowC = ['excl', 'incl'].some(r => k(r) >= 0 && R.cells[k(r)].t && R.cells[k(r)].c < 70);
+      if (/סה["״']?[כב]/.test(sup + ' ' + svc)) { if (inc) out.totalIncl = inc; if (e) out.totalExcl = e; return; }
+      if (/תקציב|אחוז\s*ניצול|מאושר/.test(sup)) return;
+      if (!sup && !svc) return;
+      if (e == null && inc == null) return;
+      let ok, note = '';
+      if (e != null && inc != null) {
+        ok = fitsR(e, inc, rates);
+        if (!ok) for (const [de, di] of [[100, 100], [1, 100], [100, 1]]) if (fitsR(e / de, inc / di, rates)) { e = Math.round(e / de * 100) / 100; inc = Math.round(inc / di * 100) / 100; ok = true; note = 'תוקנה נקודה עשרונית שלא זוהתה'; break; }
+        if (!ok) { const lead = v => String(Math.floor(Math.abs(v))).slice(0, 4);
+          for (const r of rates) { const ci = e * (1 + r / 100), ce = inc / (1 + r / 100);
+            if (inc < ci * 0.5 && lead(inc).length >= 3 && String(Math.floor(ci)).startsWith(lead(inc))) { inc = null; note = 'ספרות חסרות בסכום כולל מע"מ – חושב מהסכום ללא מע"מ'; break; }
+            if (e < ce * 0.5 && lead(e).length >= 3 && String(Math.floor(ce)).startsWith(lead(e))) { e = null; note = 'ספרות חסרות בסכום ללא מע"מ – חושב מהסכום כולל מע"מ'; break; } } }
+      } else ok = true;                                     // one amount only: nothing to cross-check
+      out.rows.push({ sup: sup || svc, svc: sup ? svc : '', excl: e, incl: inc, ok: ok && !lowC, note });
+    });
+    if (out.rows.length > 2) {                              // last row equal to the sum above it = the table's total
+      const last = out.rows[out.rows.length - 1], v = x => x.incl != null ? x.incl : x.excl;
+      const rest = out.rows.slice(0, -1).reduce((a, r) => a + (v(r) || 0), 0);
+      if (v(last) && (Math.abs(v(last) - rest) / Math.abs(v(last)) < 0.03 || (out.rows.slice(0, -1).every(r => (v(r) || 0) < v(last)) && v(last) > 0.8 * rest))) {
+        out.rows.pop(); if (!out.totalIncl && last.incl) out.totalIncl = last.incl; if (!out.totalExcl && last.excl) out.totalExcl = last.excl; }
+    }
+    const tot = out.totalIncl || out.totalExcl;
+    if (tot) out.rows.forEach(r => ['incl', 'excl'].forEach(f => { if (r[f] > tot * 1.01 && r[f] / 100 <= tot) { r[f] = Math.round(r[f]) / 100; r.ok = false; r.note = 'תוקנה נקודה עשרונית שלא זוהתה'; } }));
+    return out;
+  }
+  return { table, guess, apply, sigOf, toNum };
+})();
 </script>
 
 <script>
@@ -426,8 +452,9 @@ async function loadAll(){
     try{const q=await TO(S.db.collection('projects').orderBy('updatedAt','desc').limit(300).get(),12000);S.projects=q.docs.map(d=>d.data())}
     catch(e){S.dbErr=e.code==='timeout'?'אין חיבור למסד הנתונים. ודאו שחוקי Realtime Database מאפשרים קריאה וכתיבה.':'לא ניתן לטעון פרויקטים: '+(e.message||e.code);toast(S.dbErr);return}
     try{const q=await S.db.collection('suppliers').limit(1000).get();S.sup={};q.docs.forEach(d=>{S.sup[d.id]=d.data()})}catch(e){}
+    try{const q=await S.db.collection('templates').limit(500).get();S.tpl=q.docs.map(d=>d.data())}catch(e){}
     try{const v=await S.db.doc('settings/vat').get();if(v.exists&&Array.isArray(v.data().rates))S.vat=v.data().rates}catch(e){}
-  }else{S.projects=LS.get('projects')||[];S.sup=LS.get('sup')||{};S.vat=LS.get('vat')||DEFAULT_VAT}
+  }else{S.projects=LS.get('projects')||[];S.sup=LS.get('sup')||{};S.vat=LS.get('vat')||DEFAULT_VAT;S.tpl=LS.get('tpl')||[]}
 }
 function touch(){if(!S.P)return;S.P.updatedAt=Date.now();dirty=true;$('#saveSt').textContent='שינויים לא שמורים…';clearTimeout(saveT);saveT=setTimeout(save,1200)}
 async function save(){
@@ -447,6 +474,11 @@ async function rememberSupplier(r,cat){
   for(const k of keys){S.sup[k]={...body,svc:k===keys[1]?'':r.svc};
     if(S.db){try{await S.db.doc('suppliers/'+k).set(S.sup[k])}catch(e){}}}
   if(!S.db)LS.set('sup',S.sup);
+}
+async function saveTemplate(T,roles){
+  const sig=OT.sigOf(T),t={sig,roles,n:T.cols.length,header:T.header,at:Date.now()};
+  S.tpl=(S.tpl||[]).filter(x=>x.sig!==sig);S.tpl.push(t);
+  if(S.db){try{await S.db.doc('templates/'+hash(sig)).set(t)}catch(e){}}else LS.set('tpl',S.tpl);
 }
 async function saveVat(){if(S.db){try{await S.db.doc('settings/vat').set({rates:S.vat})}catch(e){toast('לא נשמר')}}else LS.set('vat',S.vat)}
 
@@ -484,7 +516,7 @@ async function loadPdf(file){
   if(!window.pdfjsLib){toast('רכיב קריאת PDF לא נטען');return}
   pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   const buf=await file.arrayBuffer();
-  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  const pdf=await pdfjsLib.getDocument({data:buf}).promise;S.pdfDoc=pdf;
   S.pages.forEach(p=>URL.revokeObjectURL(p.url));S.pages=[];
   for(let i=1;i<=pdf.numPages;i++){
     const page=await pdf.getPage(i);const v0=page.getViewport({scale:1});const sc=Math.min(2.4,1700/v0.width);
@@ -502,6 +534,17 @@ function parseJSON(t){t=String(t||'').replace(/```json|```/g,'');const a=t.index
 const CATMAP={execution:'exec',planning:'plan',management:'mgmt',fee:'fee',levies:'levy'};
 function toISO(s){if(!s)return '';const m=String(s).match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);if(!m)return '';let y=+m[3];if(y<100)y+=2000;return `${y}-${String(+m[2]).padStart(2,'0')}-${String(+m[1]).padStart(2,'0')}`}
 let ocrWorker=null;
+async function ocrCanvas(n){
+  const page=await S.pdfDoc.getPage(n);const v0=page.getViewport({scale:1});const vp=page.getViewport({scale:Math.min(4,2480/v0.width)});
+  const cv=document.createElement('canvas');cv.width=Math.round(vp.width);cv.height=Math.round(vp.height);const cx=cv.getContext('2d',{willReadFrequently:true});
+  cx.fillStyle='#fff';cx.fillRect(0,0,cv.width,cv.height);await page.render({canvasContext:cx,viewport:vp}).promise;
+  const W=cv.width,H=cv.height,img=cx.getImageData(0,0,W,H),d=img.data,row=new Uint32Array(H),col=new Uint32Array(W);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(d[i]*.3+d[i+1]*.59+d[i+2]*.11<160){row[y]++;col[x]++}}
+  const wipe=(i)=>{d[i]=d[i+1]=d[i+2]=255};
+  for(let y=0;y<H;y++)if(row[y]>W*.35)for(let x=0;x<W;x++)wipe((y*W+x)*4);
+  for(let x=0;x<W;x++)if(col[x]>H*.25)for(let y=0;y<H;y++)wipe((y*W+x)*4);
+  cx.putImageData(img,0,0);return cv;
+}
 async function readPdf(){
   if(!window.Tesseract){toast('רכיב זיהוי הטקסט לא נטען – בדקו חיבור לאינטרנט');return}
   const pages=S.pages.filter(p=>p.use);if(!pages.length)return;
@@ -512,28 +555,52 @@ async function readPdf(){
       ocrWorker=await Tesseract.createWorker('heb+eng',1,{logger:m=>{if(m.status==='recognizing text'&&S.ocrPage){S.ocrPage.pct=Math.round(m.progress*100);const el=document.querySelector(`[data-st="${S.ocrPage.n}"]`);if(el)el.textContent=`מזהה… ${S.ocrPage.pct}%`}}});
       await ocrWorker.setParameters({tessedit_pageseg_mode:'6',preserve_interword_spaces:'1'});S.ocrMsg='';}
   }catch(e){S.reading=false;S.ocrMsg='';toast('לא ניתן לטעון את רכיב זיהוי הטקסט');render();return}
-  const rates=[...new Set([projVat(),...S.vat.map(x=>x.rate)])];
+  const rates=[...new Set([projVat(),...S.vat.map(x=>x.rate)])];S.tabs=[];
   for(const pg of pages){
     pg.st='run';pg.err='';S.ocrPage=pg;render();
     try{
-      const {data}=await ocrWorker.recognize(pg.blob);
-      const o=ocrParsePage(data.lines||[],rates);
-      const pj=o.project||{};
+      const cv=S.pdfDoc?await ocrCanvas(pg.n):null;
+      const {data}=await ocrWorker.recognize(cv||pg.blob);
+      const T=OT.table(data.lines||[],cv?cv.width:1654);
+      const pj=T.project||{};
       const setF=(k,v)=>{if(v==null||v==='')return;if(P[k]==null||P[k]===''){P[k]=v;P.src[k]='pdf'}};
       setF('num',pj.number);setF('name',pj.name);setF('finalDate',toISO(pj.date));
-      if(o.isTable){tables++;
-        o.rows.forEach(x=>{const r={id:uid(),sup:x.sup,svc:x.svc,excl:x.excl,incl:x.incl,rate:null,calc:'',page:pg.n,note:x.note||'',ok:false,flag:!x.ok,src:'ocr'};
-          if(r.excl==null&&r.incl!=null)r.calc='excl';fixVat(r);const s=suggest(r);r.cat=s.cat;r.catSrc=s.src;P.rows.push(r);added++;if(r.flag)flagged++});
-        if(o.totalIncl&&!P.reportIncl)P.reportIncl=o.totalIncl;if(o.totalExcl&&!P.reportExcl)P.reportExcl=o.totalExcl;
-        pg.err=`${o.rows.length} שורות`;
-      }else pg.err='לא נמצאה טבלת ספקים בעמוד';
+      if(T.rows.length>=2){const g=OT.guess(T,S.tpl,rates);S.tabs.push({page:pg.n,T,roles:g.roles,from:g.from});pg.err=`טבלה: ${T.rows.length} שורות, ${T.cols.length} עמודות`}
+      else pg.err='לא נמצאה טבלה בעמוד';
       pg.st='done';touch();
-    }catch(e){pg.st='err';pg.err='הזיהוי נכשל בעמוד זה'}
+    }catch(e){console.error(e);pg.st='err';pg.err='הזיהוי נכשל בעמוד זה'}
     render();
   }
-  S.ocrPage=null;S.reading=false;{const k=S.pages.findIndex(p=>/שורות/.test(p.err||''));if(k>=0)S.pageSel=k}
-  toast(added?`נקלטו ${added} שורות, ${flagged} מסומנות לבדיקה. עברו ל"שורות ובדיקה".`:(tables?'לא זוהו שורות':'לא נמצאה טבלת ספקים בעמודים שנבחרו'));
+  S.ocrPage=null;S.reading=false;
+  toast(S.tabs.length?'בדקו את סימון העמודות ולחצו "קליטת השורות"':'לא נמצאה טבלה בעמודים שנבחרו');
   render();
+}
+function importTabs(){
+  const P=S.P,rates=[...new Set([projVat(),...S.vat.map(x=>x.rate)])];let added=0,flagged=0;
+  (S.tabs||[]).forEach(tb=>{
+    const o=OT.apply(tb.T,tb.roles,rates);
+    o.rows.forEach(x=>{const r={id:uid(),sup:x.sup,svc:x.svc,excl:x.excl,incl:x.incl,rate:null,calc:'',page:tb.page,note:x.note||'',ok:false,flag:!x.ok,src:'ocr'};
+      if(r.excl==null&&r.incl!=null)r.calc='excl';fixVat(r);const s=suggest(r);r.cat=s.cat;r.catSrc=s.src;P.rows.push(r);added++;if(r.flag)flagged++});
+    if(o.totalIncl&&!P.reportIncl)P.reportIncl=o.totalIncl;if(o.totalExcl&&!P.reportExcl)P.reportExcl=o.totalExcl;
+    saveTemplate(tb.T,tb.roles);
+  });
+  {const k=S.pages.findIndex(p=>p.n===(S.tabs[0]||{}).page);if(k>=0)S.pageSel=k}
+  S.tabs=[];touch();S.tab='rows';render();
+  toast(`נקלטו ${added} שורות${flagged?`, ${flagged} מסומנות לבדיקה`:''}.`);
+}
+const ROLES=[['','להתעלם'],['sup','שם ספק'],['svc','תיאור / סוג שירות'],['incl','סכום כולל מע"מ'],['excl','סכום ללא מע"מ']];
+function mapView(){
+  if(!S.tabs||!S.tabs.length)return'';
+  const col={sup:'#dbeafe',svc:'#ede9fe',incl:'var(--mint)',excl:'#fde68a'};
+  return `<div style="margin-top:22px"><h3>סימון עמודות</h3>
+  <p class="muted small" style="margin:6px 0 12px">המערכת חילקה את הטבלה לעמודות. בחרו מה כל עמודה – מספיק שם ספק וסכום אחד לפחות. הסימון נשמר, ובדוח הבא באותו פורמט הוא יוחל אוטומטית.</p>
+  ${S.tabs.map((tb,ti)=>{const T=tb.T;const ok=tb.roles.includes('sup')&&(tb.roles.includes('incl')||tb.roles.includes('excl'));
+   return `<div class="q"><div class="h"><b>עמוד ${tb.page} · ${T.rows.length} שורות</b>${tb.from==='template'?'<span class="chip conf">פורמט מוכר – הסימון הוחל אוטומטית</span>':'<span class="chip sug">פורמט חדש – לבדוק את הסימון</span>'}</div>
+   <div class="tblwrap" style="max-height:420px"><table><thead><tr>${T.cols.map((c,k)=>`<th style="min-width:120px;background:${col[tb.roles[k]]||'var(--soft)'}"><select data-map="${ti}:${k}" aria-label="תפקיד העמודה">${ROLES.map(([v,l])=>`<option value="${v}" ${tb.roles[k]===v?'selected':''}>${l}</option>`).join('')}</select><div class="small" style="font-weight:400;margin-top:4px">${esc(c.title||'')}</div></th>`).join('')}</tr></thead>
+   <tbody>${T.rows.slice(0,10).map(r=>`<tr>${r.cells.map((c,k)=>`<td class="${/incl|excl/.test(tb.roles[k])?'n':''}" style="${tb.roles[k]?'':'color:var(--mute)'}">${esc(c.t)}</td>`).join('')}</tr>`).join('')}
+   ${T.rows.length>10?`<tr><td colspan="${T.cols.length}" class="muted small">ועוד ${T.rows.length-10} שורות…</td></tr>`:''}</tbody></table></div>
+   ${ok?'':'<p class="chip miss">יש לסמן עמודת שם ספק ולפחות עמודת סכום אחת</p>'}</div>`}).join('')}
+  <button class="pri" id="btnImport" ${S.tabs.every(tb=>tb.roles.includes('sup')&&(tb.roles.includes('incl')||tb.roles.includes('excl')))?'':'disabled'}>קליטת השורות</button></div>`;
 }
 
 /* ---------- views ---------- */
@@ -595,7 +662,7 @@ function bindList(){
 function readView(){
   const done=S.pages.filter(p=>p.st==='done').length,use=S.pages.filter(p=>p.use).length;
   return `<div class="drop" id="drop"><h3>${S.pages.length?'הדוח נטען':'העלאת החשבון הסופי (PDF סרוק)'}</h3>
-   <p class="muted">${S.pages.length?`${S.pages.length} עמודים. סמנו את העמודים עם טבלת הספקים ולחצו "זיהוי טקסט". אחרי הזיהוי בודקים ומתקנים בשלב 3.`:'גררו לכאן קובץ PDF או בחרו קובץ. הזיהוי מתבצע בדפדפן, והדוח לא נשלח לשום מקום.'}</p>
+   <p class="muted">${S.pages.length?`${S.pages.length} עמודים. סמנו את העמודים עם טבלת הספקים ולחצו "זיהוי טקסט". אחר כך מסמנים מה כל עמודה, וקולטים את השורות.`:'גררו לכאן קובץ PDF או בחרו קובץ. הזיהוי מתבצע בדפדפן, והדוח לא נשלח לשום מקום.'}</p>
    <label class="row" style="justify-content:center"><input type="file" id="file" accept="application/pdf" style="max-width:330px"></label>
    ${S.P.pdfName&&!S.pages.length?`<p class="small muted">בפרויקט זה נקרא בעבר הקובץ "${esc(S.P.pdfName)}". כדי לראות אותו לצד הטבלה – העלו אותו שוב (לא תתבצע קריאה חוזרת אלא אם תבקשו).</p>`:''}
   </div>
@@ -605,6 +672,7 @@ function readView(){
    ${S.reading||done?`<div class="prog"><i style="width:${use?done/use*100:0}%"></i></div>`:''}
    <div class="pages">${S.pages.map(p=>`<div class="pg ${p.st}"><img src="${p.url}" alt="עמוד ${p.n}"><label class="row" style="margin-top:6px;gap:6px"><input type="checkbox" data-use="${p.n}" ${p.use?'checked':''} style="width:auto"> עמוד ${p.n}</label>
    <div class="small muted" data-st="${p.n}">${p.st==='run'?'מזהה…':p.st==='done'?'✓ זוהה':p.st==='err'?'לא זוהה':''}</div>${p.err?`<div class="small ${p.st==='err'?'':'muted'}" ${p.st==='err'?'style="color:var(--badInk)"':''}>${esc(p.err)}</div>`:''}</div>`).join('')}</div>`:''}
+  ${mapView()}
   <p style="margin-top:18px"><button id="btnSkip" class="ghost">הקלדה ידנית בלי זיהוי ←</button></p>`;
 }
 function bindRead(){
@@ -613,6 +681,9 @@ function bindRead(){
   if(d){d.ondragover=e=>{e.preventDefault();d.classList.add('over')};d.ondragleave=()=>d.classList.remove('over');d.ondrop=e=>{e.preventDefault();d.classList.remove('over');const x=e.dataTransfer.files[0];if(x)loadPdf(x).catch(()=>toast('לא ניתן לפתוח את הקובץ'))}}
   document.querySelectorAll('[data-use]').forEach(c=>c.onchange=()=>{S.pages.find(p=>p.n==c.dataset.use).use=c.checked;render()});
   const b=$('#btnRead');if(b)b.onclick=readPdf;
+  document.querySelectorAll('[data-map]').forEach(sl=>sl.onchange=()=>{const [ti,k]=sl.dataset.map.split(':').map(Number);const tb=S.tabs[ti];
+    if(sl.value&&sl.value!=='svc')tb.roles=tb.roles.map(r=>r===sl.value?'':r);tb.roles[k]=sl.value;tb.from='user';render()});
+  const bi=$('#btnImport');if(bi)bi.onclick=importTabs;
   $('#btnSkip').onclick=()=>{S.tab='proj';render()};
 }
 function projView(){
