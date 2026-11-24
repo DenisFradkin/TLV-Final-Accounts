@@ -134,14 +134,13 @@ window.FA_BACKEND = (async () => {
   if (!C.firebase || !C.firebase.apiKey) return { mode: "local" };
   const { initializeApp } = await import(B + "firebase-app.js");
   const fs = await import(B + "firebase-firestore.js");
-  const au = await import(B + "firebase-auth.js");
   const app = initializeApp(C.firebase);
   if (C.recaptchaSiteKey) {
     try { const ac = await import(B + "firebase-app-check.js");
       ac.initializeAppCheck(app, { provider: new ac.ReCaptchaV3Provider(C.recaptchaSiteKey), isTokenAutoRefreshEnabled: true }); }
     catch (e) { console.warn("App Check", e); }
   }
-  const db = fs.getFirestore(app), auth = au.getAuth(app);
+  const db = fs.getFirestore(app);
   const wrap = s => ({ id: s.id, exists: s.exists(), data: () => s.data() });
   const q = (path, mods) => ({
     orderBy: (f, d) => q(path, [...mods, fs.orderBy(f, d || "asc")]),
@@ -166,12 +165,7 @@ window.FA_BACKEND = (async () => {
     };
     sample.limits = async () => ({ images: true });
   } catch (e) { console.warn("AI Logic", e); }
-  return { mode: "firebase", db: dbA, sample, auth: {
-    onChange: cb => au.onAuthStateChanged(auth, cb),
-    anon: () => au.signInAnonymously(auth),
-    signOut: () => au.signOut(auth),
-    reset: e => au.sendPasswordResetEmail(auth, e)
-  } };
+  return { mode: "firebase", db: dbA, sample };
 })();
 </script>
 
@@ -683,13 +677,7 @@ S.dl={save:async({filename,data})=>{const u=URL.createObjectURL(data instanceof 
   for(let i=0;!window.FA_BACKEND&&i<100;i++)await new Promise(r=>setTimeout(r,50));
   let BE;try{BE=(await window.FA_BACKEND)||{mode:'local'}}catch(e){console.error(e);BE={mode:'local'};toast('החיבור ל-Firebase נכשל – עובדים במצב מקומי')}
   if(BE.mode==='firebase'){
-    S.sample=BE.sample;S.auth=BE.auth;
-    let tried=false;
-    BE.auth.onChange(async u=>{
-      if(u){S.db=BE.db;S.view='boot';render();await loadAll();S.view='list';render();return}
-      if(tried)return;tried=true;
-      try{await BE.auth.anon()}catch(x){S.view='login';S.authErr=x.code||x.message;render()}
-    });
+    S.sample=BE.sample;S.db=BE.db;S.view='list';await loadAll();render();
   }else{S.view='list';await loadAll();render()}
 })();
 }
