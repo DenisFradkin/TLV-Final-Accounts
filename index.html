@@ -9,6 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
 <style>
 /*
 VOICE: clerical, calm, exact — a ledger desk, not a dashboard.
@@ -54,6 +55,7 @@ td input.num{text-align:left;direction:ltr;font-variant-numeric:tabular-nums}
 tr.grp td{background:var(--soft);font-weight:600}
 tr.child td:nth-child(2){padding-inline-start:26px}
 tr.ok td:first-child{box-shadow:inset -4px 0 var(--mint)}
+tr.flag:not(.ok) td{background:var(--warn)}
 .chip{display:inline-block;font-size:12px;padding:1px 8px;border-radius:12px;background:var(--soft);white-space:nowrap}
 .chip.pdf{background:var(--warn);color:var(--warnInk)}.chip.man{background:var(--mint);color:var(--mintInk)}.chip.miss{background:var(--bad);color:var(--badInk)}
 .chip.sug{background:var(--warn);color:var(--warnInk)}.chip.conf{background:var(--mint);color:var(--mintInk)}
@@ -123,10 +125,7 @@ window.FA_CONFIG = {
     messagingSenderId: "264332755965",
     appId: "1:264332755965:web:4501841bddf53cb9d50f94"
   },
-  // App Check (reCAPTCHA v3 site key) – נדרש לקריאה האוטומטית דרך Firebase AI Logic
-  recaptchaSiteKey: "",
-  // מודל Gemini לקריאת הסריקות (ניתן להחליף לגרסה עדכנית יותר)
-  aiModel: "gemini-3.8-flash"
+  recaptchaSiteKey: ""
 };
 </script>
 <script type="module">
@@ -162,20 +161,7 @@ window.FA_BACKEND = (async () => {
       delete: () => rt.remove(rt.ref(db, p))
     })
   };
-  let sample = null;
-  try {
-    const ai = await import(B + "firebase-ai.js");
-    const model = ai.getGenerativeModel(ai.getAI(app, { backend: new ai.GoogleAIBackend() }),
-      { model: C.aiModel || "gemini-3.8-flash", generationConfig: { responseMimeType: "application/json", temperature: 0 } });
-    const b64 = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(blob); });
-    sample = async (prompt, opt) => {
-      const parts = [prompt];
-      for (const im of (opt && opt.images) || []) parts.push({ inlineData: { data: await b64(im), mimeType: "image/jpeg" } });
-      const r = await model.generateContent(parts);
-      return { text: r.response.text() };
-    };
-    sample.limits = async () => ({ images: true });
-  } catch (e) { console.warn("AI Logic", e); }
+  const sample = null;
   return { mode: "firebase", db: dbA, sample };
 })();
 </script>
@@ -305,6 +291,117 @@ function buildWB(ExcelJS,P,opt){
   return wb;
 }
 /* ===== END EXPORT ===== */
+/* OCR → rows. Pure; works on tesseract.js v5 data.lines */
+function ocrParsePage(lines, rates){
+  rates = rates && rates.length ? rates : [17, 18];
+  const isNumTok = t => /\d/.test(t) && /^[\d.,\-₪()]+$/.test(t.replace(/[‎‏]/g, ''));
+  const toNum = t => {
+    let s = String(t).replace(/[^\d.,\-]/g, '');
+    if (!s || !/\d/.test(s)) return null;
+    if (/,\d{2}$/.test(s) && !/\.\d{2}$/.test(s)) s = s.replace(/,(\d{2})$/, '.$1');      // 1,500,00 → 1,500.00
+    s = s.replace(/,/g, '');
+    if (/^\d{1,3}\.\d{3}$/.test(s)) s = s.replace('.', '');                                // 16.380 → 16380
+    const parts = s.split('.'); if (parts.length > 2) s = parts.slice(0, -1).join('') + '.' + parts[parts.length - 1];
+    const n = Number(s); return isNaN(n) ? null : n;
+  };
+  const W = l => (l.words || []).map(w => ({ t: String(w.text || '').replace(/[‎‏]/g, '').trim(), c: w.confidence, x0: w.bbox.x0, x1: w.bbox.x1, y0: w.bbox.y0, y1: w.bbox.y1 })).filter(w => w.t);
+  const txt = ws => ws.slice().sort((a, b) => b.x0 - a.x0).map(w => w.t).join(' ');
+  const L = lines.map(l => { const ws = W(l); return { ws, text: txt(ws), y0: Math.min(...ws.map(w => w.y0)), y1: Math.max(...ws.map(w => w.y1)) }; }).filter(l => l.ws.length);
+  const out = { rows: [], project: {}, totalIncl: null, totalExcl: null, isTable: false };
+  const all = L.map(l => l.text).join('\n');
+  let m;
+  if ((m = all.match(/פרויקט[:\s]+(\d{2,6})\b/))) out.project.number = m[1];
+  if ((m = all.match(/תאריך\s*(?:דרישה|חשבון)?[^\n\d]{0,12}(\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4})/))) out.project.date = m[1];
+  const pi = L.findIndex(l => /^בפרויקט[:\s]/.test(l.text));
+  if (pi >= 0) { let nm = L[pi].text.replace(/^בפרויקט[:\s]*/, '').replace(/^-/, '').trim(); const nx = L[pi + 1]; if (nx && nx.ws.length <= 4 && !/[:]/.test(nx.text) && !/\d{3}/.test(nx.text)) nm += ' ' + nx.text; out.project.name = nm.trim(); }
+
+  const hi = L.findIndex(l => /ספק/.test(l.text) && /(שירות|סוג)/.test(l.text));
+  if (hi < 0) return out;
+  out.isTable = true;
+  const H = L[hi];
+  const svcW = H.ws.filter(w => /^(סוג|שירות)/.test(w.t));
+  const supW = H.ws.filter(w => /ספק|שם/.test(w.t));
+  const svcRight = Math.max(...svcW.map(w => w.x1));
+  const svcLeft = Math.min(...svcW.map(w => w.x0));
+  const supLeft = supW.length ? Math.min(...supW.map(w => w.x0)) : svcRight + 40;
+  const split = (svcRight + supLeft) / 2;
+  const numLeftEdge = svcLeft - 25;              // numbers live left of the service column
+  // header text below (second header line) within 45px
+  const hdr = [...H.ws]; const H2 = L[hi + 1]; if (H2 && H2.y0 - H.y1 < 45 && !H2.ws.some(w => isNumTok(w.t) && toNum(w.t) > 99)) hdr.push(...H2.ws);
+  const startData = hdr.length > H.ws.length ? hi + 2 : hi + 1;
+  // columns = clusters of the numbers' right edges (amounts are right-aligned)
+  const edges = [];
+  for (let i = startData; i < L.length; i++) L[i].ws.forEach(w => { if (w.x1 < numLeftEdge && isNumTok(w.t)) edges.push(w.x1); });
+  edges.sort((a, b) => a - b);
+  const cl = [];
+  edges.forEach(x => { const last = cl[cl.length - 1]; if (last && x - last.hi < 18) { last.hi = x; last.xs.push(x); } else cl.push({ hi: x, xs: [x] }); });
+  const C = cl.filter(c => c.xs.length >= 3).map(c => ({ r: c.xs[Math.floor(c.xs.length / 2)] }));
+  C.forEach((c, k) => { c.lo = k ? (C[k - 1].r + 12) : 0; c.hi = c.r + 12; });
+  C.forEach(c => { c.title = txt(hdr.filter(w => { const x = (w.x0 + w.x1) / 2; return x > c.lo && x <= c.hi + 30 && w.x1 < numLeftEdge + 20 && w.t !== '|'; })); });
+  const isExcl = t => /לפני/.test(t) || /ללא\s*מע/.test(t);
+  const isIncl = t => /מצטבר/.test(t) && /כולל/.test(t) && !/ללא/.test(t) && !/לפני/.test(t);
+  let iE = C.findIndex(c => isExcl(c.title)), iI = C.findIndex(c => isIncl(c.title));
+  const iPrev = C.findIndex(c => /מצטבר/.test(c.title) && /ללא/.test(c.title) && /דרישה/.test(c.title));
+  const iCur = C.findIndex(c => /דרישה/.test(c.title) && /נוכחית/.test(c.title) && !/מצטבר/.test(c.title));
+  if (iE < 0 && C.length) iE = 0;                 // leftmost column as fallback (RTL tables end with it)
+  if (iI < 0 && C.length > 1) iI = 1;
+  out.cols = C.map(c => c.title); out.iE = iE; out.iI = iI;
+  const fits = (e, i) => e > 0 && i > 0 && rates.some(r => Math.abs(i / e - (1 + r / 100)) < 0.0025);
+  const near = (a, b) => a != null && b != null && Math.abs(a - b) < 0.6;
+  for (let i = startData; i < L.length; i++) {
+    const l = L[i];
+    const cell = C.map(() => []);
+    const sup = [], svc = [];
+    l.ws.forEach(w => {
+      const x = (w.x0 + w.x1) / 2;
+      if (w.x1 < numLeftEdge && isNumTok(w.t)) { const k = C.findIndex(c => w.x1 > c.lo && w.x1 <= c.hi); if (k >= 0) cell[k].push(w); return; }
+      if (x > split) sup.push(w); else if (x > numLeftEdge - 10) svc.push(w);
+    });
+    const val = k => { if (k < 0 || !cell[k].length) return { v: null, c: 0, multi: false }; const ws = cell[k].sort((a, b) => a.x0 - b.x0); const v = toNum(ws.map(w => w.t).join('')); return { v, c: Math.min(...ws.map(w => w.c)), multi: ws.length > 1 }; };
+    while (svc.length && /^בע["״]?מ$/.test(svc.slice().sort((a, b) => b.x0 - a.x0)[0].t)) { const f = svc.slice().sort((a, b) => b.x0 - a.x0)[0]; svc.splice(svc.indexOf(f), 1); sup.push(f); }
+    const supT = txt(sup).replace(/^[\\\/|,.°'"\-_ ]+/, '').trim(), svcT = txt(svc).replace(/[|_=\\\/}{]+/g, '').trim();
+    const nums = C.map((_, k) => val(k));
+    const filled = nums.filter(n => n.v != null).length;
+    if (/^סה["״']?[כב]\b|^סה["״']?[כב]$|סה["״'][כב]\s/.test(supT) || /^סה["״']?[כב]/.test(supT)) {
+      {
+        const e = nums[iE] && nums[iE].v, ic = nums[iI] && nums[iI].v;
+        if (e && ic && !/ללא|לפני|מע/.test(supT)) { out.totalExcl = e; out.totalIncl = ic; }
+        continue;
+      }
+    }
+    if (/תקציב|אחוז\s*ניצול|מאושר/.test(l.text)) continue;
+    if (filled < 1 || !supT) continue;
+    let e = nums[iE] ? nums[iE].v : null, inc = nums[iI] ? nums[iI].v : null;
+    let ok = fits(e, inc), fixed = '';
+    { const prev = iPrev >= 0 ? nums[iPrev].v : null, cur = iCur >= 0 ? nums[iCur].v : null;
+      if (inc != null && prev != null && cur != null && !near(prev + cur, inc) && near((prev + cur) * 100, inc)) { inc = Math.round(inc) / 100; if (e != null && fits(e / 100, inc)) e = Math.round(e) / 100; fixed = 'תוקנה נקודה עשרונית שלא זוהתה'; ok = fits(e, inc); } }
+    if (!ok && e != null && inc != null) {
+      for (const [de, di] of [[100, 100], [1, 100], [100, 1]]) if (fits(e / de, inc / di)) { e = Math.round(e / de * 100) / 100; inc = Math.round(inc / di * 100) / 100; ok = true; fixed = 'תוקנה נקודה עשרונית שלא זוהתה'; break; }
+    }
+    if (!ok) {
+      const prev = iPrev >= 0 ? nums[iPrev].v : null, cur = iCur >= 0 ? nums[iCur].v : null;
+      if (prev != null && (cur === 0 || cur == null) && fits(e, prev)) { inc = prev; ok = true; fixed = 'הסכום כולל מע"מ תוקן לפי עמודת המצטבר הקודם'; }
+      else {
+        let incT = null;
+        if (inc != null && prev != null && cur != null && near(prev + cur, inc)) incT = inc;
+        else if (prev != null && cur != null && (cur === 0) ) incT = prev;
+        if (incT != null) { inc = incT; e = null; fixed = 'הסכום ללא מע"מ לא זוהה בוודאות וחושב מהסכום כולל מע"מ'; }
+      }
+    }
+    const lowC = nums.some(n => n.v != null && n.c < 70) || nums.some(n => n.multi);
+    out.rows.push({ sup: supT, svc: svcT, excl: e, incl: inc, ok: ok && !lowC, note: fixed, conf: Math.round(Math.min(...[...sup, ...svc].map(w => w.c), 100)), y: l.y0 });
+  }
+  // a last row whose amount equals the sum of the rows above it is the table's total line
+  if (out.rows.length > 2) {
+    const last = out.rows[out.rows.length - 1];
+    const rest = out.rows.slice(0, -1).reduce((a, r) => a + (r.incl || 0), 0);
+    if (last.incl && Math.abs(last.incl - rest) / last.incl < 0.03 || (last.incl && out.rows.slice(0, -1).every(r => (r.incl || 0) < last.incl) && last.incl > 0.8 * rest)) {
+      out.rows.pop(); if (!out.totalIncl) { out.totalIncl = last.incl; out.totalExcl = last.excl; }
+    }
+  }
+  if (out.totalIncl) out.rows.forEach(r => ['incl', 'excl'].forEach(f => { if (r[f] > out.totalIncl * 1.01 && r[f] / 100 <= out.totalIncl) { r[f] = Math.round(r[f]) / 100; r.ok = false; r.note = 'תוקנה נקודה עשרונית שלא זוהתה'; } }));
+  return out;
+}
 </script>
 
 <script>
@@ -401,51 +498,42 @@ async function loadPdf(file){
   if(S.P){S.P.pdfName=file.name;S.P.pages=pdf.numPages;touch()}
   render();
 }
-const PROMPT=(p,n)=>`You are reading page ${p} of ${n} of a scanned Israeli municipal "final account" (חשבון סופי / דרישת תשלום סופית) for a public-building project. Extract data exactly as printed and return ONLY one JSON object, no prose, no code fences:
-{"page_kind":"cover_letter|supplier_table|approval|other",
- "project":{"number":null,"name":null,"description":null,"company":null,"project_manager":null,"final_account_date":null,"delivery_date":null,"area_sqm":null},
- "rows":[{"supplier":"","service":"","amount_excl_vat":null,"amount_incl_vat":null,"category":"execution|planning|management|fee|levies|unknown","confidence":0.0,"note":""}],
- "total_excl_vat":null,"total_incl_vat":null,"warnings":""}
-Rules:
-- One row per printed supplier line, top to bottom, including repeated suppliers. Copy Hebrew names exactly as printed (keep בע"מ). Use "" for a blank cell.
-- Amounts are plain numbers without commas. Take the FINAL CUMULATIVE amount that INCLUDES the current demand: amount_excl_vat from the cumulative column before VAT ("לפני מע\"מ" / "ללא מע\"מ"), amount_incl_vat from the cumulative column including VAT ("כולל מע\"מ"). A column titled "מצטבר ללא דרישה נוכחית" is cumulative WITHOUT the current demand — never use it. If only one cumulative amount exists for a line, fill it and set the other to null.
-- Total lines (סה"כ, סה"כ כללי, תקציב מאושר, אחוז ניצול) are NOT rows: put the grand total of the table in total_excl_vat / total_incl_vat.
-- A fee line of the managing company (e.g. "עמלת עו\"ב 4%", "עמלת אחוזות החוף", "תקורה") IS a row, category "fee"; if it has no supplier name put the line text in supplier.
-- category: execution = building contractor and construction-phase costs (קבלן ביצוע, התייקרות, ביטוח ביצוע, ניקיון, כוח אדם באתר); planning = architects, engineers, consultants, surveyors, copying, photography; management = project management / supervision; fee = managing-company fee; levies = authorities, utilities, fees, labs, certification (חברת החשמל, מי אביבים, עירייה, כבאות, מכון התקנים, מעבדה, רשות העתיקות). confidence 0..1.
-- project fields only when printed on this page; dates as DD/MM/YYYY; "project number" is the municipal project number (מס' פרויקט).
-- Ignore stamps and handwriting unless they are the only source of a value. Never guess unreadable digits: use null and explain in note.
-- If the page has no supplier table, return "rows": [].`;
 function parseJSON(t){t=String(t||'').replace(/```json|```/g,'');const a=t.indexOf('{'),b=t.lastIndexOf('}');if(a<0||b<a)throw new Error('no json');return JSON.parse(t.slice(a,b+1))}
 const CATMAP={execution:'exec',planning:'plan',management:'mgmt',fee:'fee',levies:'levy'};
 function toISO(s){if(!s)return '';const m=String(s).match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);if(!m)return '';let y=+m[3];if(y<100)y+=2000;return `${y}-${String(+m[2]).padStart(2,'0')}-${String(+m[1]).padStart(2,'0')}`}
+let ocrWorker=null;
 async function readPdf(){
-  if(!S.sample){toast('קריאה אוטומטית לא זמינה כאן – אפשר להקליד שורות ידנית');return}
+  if(!window.Tesseract){toast('רכיב זיהוי הטקסט לא נטען – בדקו חיבור לאינטרנט');return}
   const pages=S.pages.filter(p=>p.use);if(!pages.length)return;
   S.reading=true;render();
-  const P=S.P;let added=0;
+  const P=S.P;let added=0,flagged=0,tables=0;
+  try{
+    if(!ocrWorker){S.ocrMsg='טוען מילון עברית (פעם ראשונה בלבד)…';render();
+      ocrWorker=await Tesseract.createWorker('heb+eng',1,{logger:m=>{if(m.status==='recognizing text'&&S.ocrPage){S.ocrPage.pct=Math.round(m.progress*100);const el=document.querySelector(`[data-st="${S.ocrPage.n}"]`);if(el)el.textContent=`מזהה… ${S.ocrPage.pct}%`}}});
+      await ocrWorker.setParameters({tessedit_pageseg_mode:'6',preserve_interword_spaces:'1'});S.ocrMsg='';}
+  }catch(e){S.reading=false;S.ocrMsg='';toast('לא ניתן לטעון את רכיב זיהוי הטקסט');render();return}
+  const rates=[...new Set([projVat(),...S.vat.map(x=>x.rate)])];
   for(const pg of pages){
-    pg.st='run';render();
-    let j=null;
-    for(let attempt=0;attempt<2&&!j;attempt++){
-      try{const res=await S.sample(PROMPT(pg.n,S.pages.length),{images:[pg.blob],modelTier:'complex'});j=parseJSON(res.text)}
-      catch(e){if(e&&e.code==='not_granted'){S.sample=null;toast('לא ניתנה הרשאה לקריאה אוטומטית');pg.st='err';S.reading=false;render();return}
-        if(e&&(e.code==='rate_limited'||/429|quota|exhaust/i.test(e.message||'')))await new Promise(r=>setTimeout(r,6000));if(attempt){const m=String((e&&e.message)||'');pg.err=/403|permission/i.test(m)?'הקריאה האוטומטית לא הופעלה ב-Firebase (AI Logic / App Check)':/404|not found/i.test(m)?'שם המודל לא נמצא – יש לעדכן aiModel':/429|quota|exhaust/i.test(m)?'חריגה ממכסת השימוש – נסו שוב בעוד דקה':'שגיאה בקריאה: '+m.slice(0,120)}}
-    }
-    if(!j){pg.st='err';render();continue}
-    const pj=j.project||{};
-    const setF=(k,v)=>{if(v==null||v==='')return;if(P[k]==null||P[k]===''){P[k]=v;P.src[k]='pdf'}};
-    setF('num',pj.number);setF('name',pj.name);setF('desc',pj.description);setF('company',pj.company);setF('pm',pj.project_manager);
-    setF('finalDate',toISO(pj.final_account_date));setF('deliveryDate',toISO(pj.delivery_date));setF('area',num(pj.area_sqm));
-    (j.rows||[]).forEach(x=>{
-      const r={id:uid(),sup:String(x.supplier||'').trim(),svc:String(x.service||'').trim(),excl:num(x.amount_excl_vat),incl:num(x.amount_incl_vat),rate:null,calc:'',page:pg.n,note:String(x.note||''),ok:false,src:'pdf',ai:{cat:CATMAP[x.category]||'unknown',conf:+x.confidence||0}};
-      if(!r.sup&&!r.svc&&r.incl==null&&r.excl==null)return;
-      fixVat(r);const s=suggest(r,r.ai);r.cat=s.cat;r.catSrc=s.src;P.rows.push(r);added++});
-    if(num(j.total_incl_vat))P.reportIncl=num(j.total_incl_vat);
-    if(num(j.total_excl_vat))P.reportExcl=num(j.total_excl_vat);
-    if(j.warnings)pg.err=String(j.warnings);
-    pg.st='done';touch();render();
+    pg.st='run';pg.err='';S.ocrPage=pg;render();
+    try{
+      const {data}=await ocrWorker.recognize(pg.blob);
+      const o=ocrParsePage(data.lines||[],rates);
+      const pj=o.project||{};
+      const setF=(k,v)=>{if(v==null||v==='')return;if(P[k]==null||P[k]===''){P[k]=v;P.src[k]='pdf'}};
+      setF('num',pj.number);setF('name',pj.name);setF('finalDate',toISO(pj.date));
+      if(o.isTable){tables++;
+        o.rows.forEach(x=>{const r={id:uid(),sup:x.sup,svc:x.svc,excl:x.excl,incl:x.incl,rate:null,calc:'',page:pg.n,note:x.note||'',ok:false,flag:!x.ok,src:'ocr'};
+          if(r.excl==null&&r.incl!=null)r.calc='excl';fixVat(r);const s=suggest(r);r.cat=s.cat;r.catSrc=s.src;P.rows.push(r);added++;if(r.flag)flagged++});
+        if(o.totalIncl&&!P.reportIncl)P.reportIncl=o.totalIncl;if(o.totalExcl&&!P.reportExcl)P.reportExcl=o.totalExcl;
+        pg.err=`${o.rows.length} שורות`;
+      }else pg.err='לא נמצאה טבלת ספקים בעמוד';
+      pg.st='done';touch();
+    }catch(e){pg.st='err';pg.err='הזיהוי נכשל בעמוד זה'}
+    render();
   }
-  S.reading=false;toast(`נקלטו ${added} שורות. עברו ל"שורות ובדיקה".`);render();
+  S.ocrPage=null;S.reading=false;{const k=S.pages.findIndex(p=>/שורות/.test(p.err||''));if(k>=0)S.pageSel=k}
+  toast(added?`נקלטו ${added} שורות, ${flagged} מסומנות לבדיקה. עברו ל"שורות ובדיקה".`:(tables?'לא זוהו שורות':'לא נמצאה טבלת ספקים בעמודים שנבחרו'));
+  render();
 }
 
 /* ---------- views ---------- */
@@ -457,11 +545,11 @@ function stats(){
   const missing=FIELDS.filter(f=>f[2]&&(P[f[0]]==null||P[f[0]]==='')).length;
   const unassigned=rows.filter(r=>!r.cat).length;
   const sug=rows.filter(r=>r.cat&&(r.catSrc==='rule'||r.catSrc==='ai')).length;
-  const unchecked=rows.filter(r=>!r.ok&&r.cat!=='skip').length,skip=rows.filter(r=>r.cat==='skip').length;
+  const unchecked=rows.filter(r=>!r.ok&&r.cat!=='skip').length,skip=rows.filter(r=>r.cat==='skip').length,flag=rows.filter(r=>r.flag&&!r.ok&&r.cat!=='skip').length;
   const inc=rows.filter(r=>r.cat!=='skip');
   const sI=inc.reduce((s,r)=>s+(+r.incl||0),0),sE=inc.reduce((s,r)=>s+(+r.excl||0),0);
   const dI=P.reportIncl?sI-P.reportIncl:null,dE=P.reportExcl?sE-P.reportExcl:null;
-  return {missing,unassigned,sug,unchecked,skip,sI,sE,dI,dE,n:rows.length};
+  return {missing,unassigned,sug,unchecked,skip,flag,sI,sE,dI,dE,n:rows.length};
 }
 function render(){
   const app=$('#app');
@@ -507,17 +595,17 @@ function bindList(){
 function readView(){
   const done=S.pages.filter(p=>p.st==='done').length,use=S.pages.filter(p=>p.use).length;
   return `<div class="drop" id="drop"><h3>${S.pages.length?'הדוח נטען':'העלאת החשבון הסופי (PDF סרוק)'}</h3>
-   <p class="muted">${S.pages.length?`${S.pages.length} עמודים. סמנו אילו עמודים לקרוא ולחצו "קרא את הדוח".`:'גררו לכאן קובץ PDF או בחרו קובץ. הדוח נשאר במחשב – נשלחות לקריאה רק תמונות העמודים שתסמנו.'}</p>
+   <p class="muted">${S.pages.length?`${S.pages.length} עמודים. סמנו את העמודים עם טבלת הספקים ולחצו "זיהוי טקסט". אחרי הזיהוי בודקים ומתקנים בשלב 3.`:'גררו לכאן קובץ PDF או בחרו קובץ. הזיהוי מתבצע בדפדפן, והדוח לא נשלח לשום מקום.'}</p>
    <label class="row" style="justify-content:center"><input type="file" id="file" accept="application/pdf" style="max-width:330px"></label>
    ${S.P.pdfName&&!S.pages.length?`<p class="small muted">בפרויקט זה נקרא בעבר הקובץ "${esc(S.P.pdfName)}". כדי לראות אותו לצד הטבלה – העלו אותו שוב (לא תתבצע קריאה חוזרת אלא אם תבקשו).</p>`:''}
   </div>
-  ${S.pages.length?`<div class="row" style="margin-top:14px"><button class="pri" id="btnRead" ${S.reading||!use||!S.sample?'disabled':''}>${S.reading?'קורא…':`קרא את הדוח (${use} עמ')`}</button>
-   ${!S.sample?'<span class="chip miss">קריאה אוטומטית לא זמינה בתצוגה זו – אפשר להזין ידנית בשלב 3</span>':''}
-   ${S.P.rows.length?`<span class="muted small">כבר קיימות ${S.P.rows.length} שורות – קריאה נוספת תוסיף שורות.</span>`:''}</div>
+  ${S.pages.length?`<div class="row" style="margin-top:14px"><button class="pri" id="btnRead" ${S.reading||!use?'disabled':''}>${S.reading?'מזהה טקסט…':`זיהוי טקסט מהסריקה (${use} עמ')`}</button>
+   ${S.ocrMsg?`<span class="muted small">${esc(S.ocrMsg)}</span>`:''}
+   ${S.P.rows.length?`<span class="muted small">כבר קיימות ${S.P.rows.length} שורות – זיהוי נוסף יוסיף שורות.</span>`:''}</div>
    ${S.reading||done?`<div class="prog"><i style="width:${use?done/use*100:0}%"></i></div>`:''}
    <div class="pages">${S.pages.map(p=>`<div class="pg ${p.st}"><img src="${p.url}" alt="עמוד ${p.n}"><label class="row" style="margin-top:6px;gap:6px"><input type="checkbox" data-use="${p.n}" ${p.use?'checked':''} style="width:auto"> עמוד ${p.n}</label>
-   <div class="small muted">${p.st==='run'?'קורא…':p.st==='done'?'✓ נקרא':p.st==='err'?'לא נקרא':''}</div>${p.err?`<div class="small" style="color:var(--badInk)">${esc(p.err)}</div>`:''}</div>`).join('')}</div>`:''}
-  <p style="margin-top:18px"><button id="btnSkip" class="ghost">המשך ללא קריאה אוטומטית ←</button></p>`;
+   <div class="small muted" data-st="${p.n}">${p.st==='run'?'מזהה…':p.st==='done'?'✓ זוהה':p.st==='err'?'לא זוהה':''}</div>${p.err?`<div class="small ${p.st==='err'?'':'muted'}" ${p.st==='err'?'style="color:var(--badInk)"':''}>${esc(p.err)}</div>`:''}</div>`).join('')}</div>`:''}
+  <p style="margin-top:18px"><button id="btnSkip" class="ghost">הקלדה ידנית בלי זיהוי ←</button></p>`;
 }
 function bindRead(){
   const f=$('#file'),d=$('#drop');
@@ -553,7 +641,7 @@ function catSel(val,attr){return `<select ${attr} aria-label="שיוך"><option 
 const fx=v=>v==null||v===''?'':(Number.isInteger(+v)?String(v):(+v).toFixed(2));
 function rowTr(r,child){
   const flag=vatFlag(r);
-  return `<tr class="${child?'child':''} ${r.ok?'ok':''}" data-r="${r.id}">
+  return `<tr class="${child?'child':''} ${r.ok?'ok':''} ${r.flag?'flag':''}" data-r="${r.id}" ${r.flag&&!r.ok?'title="זוהה בחוסר ודאות – לבדוק מול הסריקה"':''}>
   <td><input type="checkbox" data-ok ${r.ok?'checked':''} aria-label="נבדק" style="width:auto"></td>
   <td><input data-k="sup" value="${esc(r.sup)}" aria-label="ספק"></td>
   <td><input data-k="svc" value="${esc(r.svc)}" aria-label="סוג שירות"></td>
@@ -571,23 +659,23 @@ function rowsView(){
    <span>סה"כ שורות כולל מע"מ: <b>${money(st.sI)}</b></span>${P.reportIncl?`<span>לפי הדוח: <b>${money(P.reportIncl)}</b></span><span>הפרש: <b>${money(st.dI)}</b></span>`:''}
    ${P.reportExcl?`<span>ללא מע"מ: <b>${money(st.sE)}</b> מול <b>${money(P.reportExcl)}</b> (הפרש <b>${money(st.dE)}</b>)</span>`:''}</div>`
    :`<div class="recon"><span>סה"כ שורות כולל מע"מ: <b>${money(st.sI)}</b> · ללא מע"מ: <b>${money(st.sE)}</b></span><span class="muted">להשוואה מול הדוח הזינו את הסה"כ בשלב 2</span></div>`;
-  const body=S.grouped?gs.map(([k,rs])=>{if(rs.length===1)return rowTr(rs[0]);const open=S.open[k];
+  const body=S.grouped&&!S.flagOnly?gs.map(([k,rs])=>{if(rs.length===1)return rowTr(rs[0]);const open=S.open[k];
     const cats=[...new Set(rs.map(r=>r.cat||''))];const c=cats.length===1?cats[0]:'mixed';const allOk=rs.every(r=>r.ok);
     return `<tr class="grp" data-g="${esc(k)}"><td><input type="checkbox" data-gok ${allOk?'checked':''} aria-label="נבדק" style="width:auto"></td>
-     <td colspan="2"><button class="sm ghost" data-tg aria-expanded="${!!open}">${open?'▾':'◂'}</button> ${esc(rs[0].sup)} · ${esc(rs[0].svc)} <span class="chip">${rs.length} שורות</span></td>
+     <td colspan="2"><button class="sm ghost" data-tg aria-expanded="${!!open}">${open?'▾':'◂'}</button> ${esc(rs[0].sup)} · ${esc(rs[0].svc)} <span class="chip">${rs.length} שורות</span>${rs.some(r=>r.flag&&!r.ok)?' <span class="chip sug">לבדיקה</span>':''}</td>
      <td class="n">${money(rs.reduce((s,r)=>s+(+r.excl||0),0))}</td><td class="n">${money(rs.reduce((s,r)=>s+(+r.incl||0),0))}</td><td></td>
      <td>${catSel(c,'data-gcat')}</td><td></td><td></td><td></td></tr>${open?rs.map(r=>rowTr(r,1)).join(''):''}`}).join('')
-   :P.rows.map(r=>rowTr(r)).join('');
+   :P.rows.filter(r=>!S.flagOnly||(r.flag&&!r.ok)).map(r=>rowTr(r)).join('');
   return `${recon}<div class="bar2"><span class="seg"><button data-gr="1" class="${S.grouped?'on':''}">מקובץ לפי ספק</button><button data-gr="0" class="${S.grouped?'':'on'}">כל השורות</button></span>
    ${S.grouped?'<button class="sm" id="expAll">פתח הכל</button><button class="sm" id="colAll">כווץ הכל</button>':''}
    <button class="sm" id="addR">+ שורה</button><button class="sm" id="okAll">סמן הכל כנבדק</button>${S.pages.length?`<button class="sm" id="hv">${S.hideV?'הצג דוח':'הסתר דוח'}</button>`:`<span class="small muted">${S.P.pdfName?'להצגת הדוח לצד הטבלה העלו אותו שוב בשלב 1':''}</span>`}
-   <span class="muted small">נבדקו ${st.n-st.skip-st.unchecked} מתוך ${st.n-st.skip}</span></div>
+   <span class="muted small">נבדקו ${st.n-st.skip-st.unchecked} מתוך ${st.n-st.skip}</span>${st.flag?`<button class="sm" id="flagOnly" style="background:var(--warn);color:var(--warnInk)">${S.flagOnly?'הצג הכל':`הצג רק ${st.flag} לבדיקה`}</button>`:''}</div>
   <div class="split ${S.hideV||!S.pages.length?'nov':''}">${S.hideV||!S.pages.length?'':S.pages.length?`<div class="viewer"><div class="bar"><span class="small">עמוד</span>${S.pages.map((p,i)=>`<button class="sm ${S.pageSel===i?'pri':''}" data-vp="${i}">${p.n}</button>`).join('')}<span style="flex:1"></span><button class="sm" data-z="-1" aria-label="הקטנה">−</button><button class="sm" data-z="1" aria-label="הגדלה">+</button></div>
    <div class="img"><img src="${S.pages[S.pageSel]?S.pages[S.pageSel].url:''}" alt="עמוד מהדוח" style="width:${S.zoom*100}%"></div></div>`
    :`<div class="viewer"><div style="padding:20px" class="muted small">${S.P.pdfName?`להצגת הדוח לצד הטבלה העלו שוב את "${esc(S.P.pdfName)}" בשלב 1.`:'לא הועלה דוח. אפשר להזין שורות ידנית.'}</div></div>`}
   <div class="tblwrap"><table class="rt"><thead><tr><th>✓</th><th>שם ספק</th><th>סוג שירות / תפקיד</th><th class="n">ללא מע"מ</th><th class="n">כולל מע"מ</th><th>מע"מ</th><th>שיוך</th><th>עמ'</th><th>הערה</th><th></th></tr></thead>
   <tbody>${body||'<tr><td colspan="10" class="muted" style="padding:30px;text-align:center">אין שורות עדיין. קראו את הדוח בשלב 1 או הוסיפו שורה.</td></tr>'}</tbody></table></div></div>
-  <p class="small muted">סכום בכתב נטוי = חושב אוטומטית לפי שיעור המע"מ. ⚠ = היחס בין הסכומים לא תואם שיעור מע"מ ידוע.</p>`;
+  <p class="small muted">שורה צהובה = זוהתה בחוסר ודאות, לבדוק מול הסריקה ולסמן ✓. סכום בכתב נטוי = חושב לפי שיעור המע"מ. ⚠ = היחס בין הסכומים לא תואם שיעור מע"מ ידוע.</p>`;
 }
 function rr(){setTimeout(()=>{const a=document.activeElement;let sel=null,pos=null;
   if(a&&a.matches&&a.matches('input,select,textarea')){const tr=a.closest('tr[data-r]');const k=a.dataset.k||a.dataset.f;
@@ -600,6 +688,7 @@ function bindRows(){
   const ca=$('#colAll');if(ca)ca.onclick=()=>{S.open={};render()};
   $('#addR').onclick=()=>{const r={id:uid(),sup:'',svc:'',excl:null,incl:null,rate:null,calc:'',page:S.pages[S.pageSel]?S.pages[S.pageSel].n:null,note:'',ok:false,src:'manual',cat:''};S.P.rows.push(r);S.grouped=false;touch();render();const tr=document.querySelector(`tr[data-r="${r.id}"] input[data-k=sup]`);if(tr)tr.focus()};
   const hv=$('#hv');if(hv)hv.onclick=()=>{S.hideV=!S.hideV;render()};
+  const fo=$('#flagOnly');if(fo)fo.onclick=()=>{S.flagOnly=!S.flagOnly;render()};
   $('#okAll').onclick=()=>{S.P.rows.forEach(r=>r.ok=true);touch();render()};
   document.querySelectorAll('[data-vp]').forEach(b=>b.onclick=()=>{S.pageSel=+b.dataset.vp;render()});
   document.querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{S.zoom=Math.max(.5,Math.min(3,S.zoom+(+b.dataset.z)*.25));render()});
@@ -611,6 +700,7 @@ function bindRows(){
       else if(k==='rate'){r.rate=v===''?null:+v;if(!r.calc)r.calc='excl';fixVat(r)}
       else if(k==='cat'){r.cat=v;r.catSrc='user';if(v&&v!=='skip')rememberSupplier(r,v)}
       else r[k]=v.trim();
+      if(k==='excl'||k==='incl')r.flag=false;
       if((k==='sup'||k==='svc')&&!r.cat){const s=suggest(r,r.ai);r.cat=s.cat;r.catSrc=s.src}
       touch();rr()});
     const pg=tr.querySelector('[data-pg]');if(pg)pg.onclick=()=>{const i=S.pages.findIndex(p=>p.n==pg.dataset.pg);if(i>=0){S.pageSel=i;render()}};
@@ -650,6 +740,7 @@ function expView(){
   const items=[[!st.missing,st.missing?`חסרים ${st.missing} שדות חובה בנתוני הפרויקט`:'נתוני הפרויקט מלאים'],
     [!st.unassigned,st.unassigned?`${st.unassigned} שורות לא משויכות – לא ייכללו בטבלה`:'כל השורות משויכות'],
     [!st.sug,st.sug?`${st.sug} שיוכים מוצעים עדיין לא אושרו`:'כל השיוכים אושרו'],
+    [!st.flag,st.flag?`${st.flag} שורות שזוהו בחוסר ודאות עדיין לא נבדקו`:'אין שורות פתוחות מהזיהוי'],
     [!st.unchecked,st.unchecked?`${st.unchecked} שורות עדיין לא סומנו כנבדקו`:'כל השורות נבדקו'],
     [P.reportIncl?Math.abs(st.dI)<1:false,P.reportIncl?(Math.abs(st.dI)<1?'הסה"כ תואם לדוח':`הפרש של ${money(st.dI)} ₪ מול סה"כ הדוח`):'לא הוזן סה"כ הדוח להשוואה']];
   return `<h3>לפני ההפקה</h3><div class="chk">${items.map(([ok,t])=>`<div class="${ok?'ok':'w'}">${ok?'✓':'!'} ${t}</div>`).join('')}</div>
