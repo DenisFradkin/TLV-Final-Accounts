@@ -62,7 +62,7 @@ tr.ok td:first-child{box-shadow:inset -4px 0 var(--mint)}
 .pages{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-top:16px}
 .pg{border:1px solid var(--line);border-radius:8px;padding:6px;background:var(--bg);font-size:13px}
 .pg img{width:100%;display:block;border-radius:4px;background:#fff}
-.pg.done{border-color:var(--mintInk)}.pg.err{border-color:var(--badInk)}.pg.run{border-color:var(--warnInk)}
+.pg div{overflow-wrap:anywhere}.pg.done{border-color:var(--mintInk)}.pg.err{border-color:var(--badInk)}.pg.run{border-color:var(--warnInk)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr));gap:14px 22px}
 .fld label{display:flex;justify-content:space-between;gap:8px;font-size:14px;color:var(--mute);margin-bottom:4px}
 .split{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:16px;align-items:start}.split.nov{grid-template-columns:minmax(0,1fr)}
@@ -429,7 +429,7 @@ async function readPdf(){
     for(let attempt=0;attempt<2&&!j;attempt++){
       try{const res=await S.sample(PROMPT(pg.n,S.pages.length),{images:[pg.blob],modelTier:'complex'});j=parseJSON(res.text)}
       catch(e){if(e&&e.code==='not_granted'){S.sample=null;toast('לא ניתנה הרשאה לקריאה אוטומטית');pg.st='err';S.reading=false;render();return}
-        if(e&&(e.code==='rate_limited'||/429|quota|exhaust/i.test(e.message||'')))await new Promise(r=>setTimeout(r,6000));if(attempt)pg.err=(e&&e.message)||'שגיאה'}
+        if(e&&(e.code==='rate_limited'||/429|quota|exhaust/i.test(e.message||'')))await new Promise(r=>setTimeout(r,6000));if(attempt){const m=String((e&&e.message)||'');pg.err=/403|permission/i.test(m)?'הקריאה האוטומטית לא הופעלה ב-Firebase (AI Logic / App Check)':/404|not found/i.test(m)?'שם המודל לא נמצא – יש לעדכן aiModel':/429|quota|exhaust/i.test(m)?'חריגה ממכסת השימוש – נסו שוב בעוד דקה':'שגיאה בקריאה: '+m.slice(0,120)}}
     }
     if(!j){pg.st='err';render();continue}
     const pj=j.project||{};
