@@ -117,6 +117,7 @@ window.FA_CONFIG = {
   firebase: {
     apiKey: "AIzaSyAVy8vZn8rw2ao5QIR059m3hM9RFDrrKGo",
     authDomain: "tlv-final-accounts.firebaseapp.com",
+    databaseURL: "https://tlv-final-accounts-default-rtdb.europe-west1.firebasedatabase.app",
     projectId: "tlv-final-accounts",
     storageBucket: "tlv-final-accounts.firebasestorage.app",
     messagingSenderId: "264332755965",
@@ -133,23 +134,33 @@ const C = window.FA_CONFIG, B = "https://www.gstatic.com/firebasejs/12.18.0/";
 window.FA_BACKEND = (async () => {
   if (!C.firebase || !C.firebase.apiKey) return { mode: "local" };
   const { initializeApp } = await import(B + "firebase-app.js");
-  const fs = await import(B + "firebase-firestore.js");
   const app = initializeApp(C.firebase);
   if (C.recaptchaSiteKey) {
     try { const ac = await import(B + "firebase-app-check.js");
       ac.initializeAppCheck(app, { provider: new ac.ReCaptchaV3Provider(C.recaptchaSiteKey), isTokenAutoRefreshEnabled: true }); }
     catch (e) { console.warn("App Check", e); }
   }
-  const db = fs.getFirestore(app);
-  const wrap = s => ({ id: s.id, exists: s.exists(), data: () => s.data() });
-  const q = (path, mods) => ({
-    orderBy: (f, d) => q(path, [...mods, fs.orderBy(f, d || "asc")]),
-    limit: n => q(path, [...mods, fs.limit(n)]),
-    get: async () => { const r = await fs.getDocs(fs.query(fs.collection(db, path), ...mods)); return { docs: r.docs.map(wrap) }; }
+  const rt = await import(B + "firebase-database.js");
+  const db = rt.getDatabase(app);
+  const wrap = (id, v) => ({ id, exists: v != null, data: () => v });
+  const q = (path, o) => ({
+    orderBy: (f, d) => q(path, { ...o, f, d: d || "asc" }),
+    limit: n => q(path, { ...o, n }),
+    get: async () => {
+      const v = (await rt.get(rt.ref(db, path))).val() || {};
+      let docs = Object.entries(v).map(([k, x]) => wrap(k, x));
+      if (o.f) docs.sort((a, b) => ((a.data()[o.f] || 0) - (b.data()[o.f] || 0)) * (o.d === "desc" ? -1 : 1));
+      if (o.n) docs = docs.slice(0, o.n);
+      return { docs };
+    }
   });
   const dbA = {
-    collection: p => q(p, []),
-    doc: p => ({ get: async () => wrap(await fs.getDoc(fs.doc(db, p))), set: d => fs.setDoc(fs.doc(db, p), d), delete: () => fs.deleteDoc(fs.doc(db, p)) })
+    collection: p => q(p, {}),
+    doc: p => ({
+      get: async () => { const s = await rt.get(rt.ref(db, p)); return wrap(p.split("/").pop(), s.val()); },
+      set: d => rt.set(rt.ref(db, p), JSON.parse(JSON.stringify(d))),
+      delete: () => rt.remove(rt.ref(db, p))
+    })
   };
   let sample = null;
   try {
@@ -314,7 +325,9 @@ let saveT=null,saving=false,dirty=false;
 const LS={get(k){try{return JSON.parse(localStorage.getItem('fa_'+k))}catch(e){return null}},set(k,v){try{localStorage.setItem('fa_'+k,JSON.stringify(v))}catch(e){}}};
 async function loadAll(){
   if(S.db){
-    try{const q=await S.db.collection('projects').orderBy('updatedAt','desc').limit(300).get();S.projects=q.docs.map(d=>d.data())}catch(e){toast('לא ניתן לטעון פרויקטים: '+(e.message||e.code))}
+    const TO=(p,ms)=>Promise.race([p,new Promise((_,j)=>setTimeout(()=>j({code:'timeout'}),ms))]);
+    try{const q=await TO(S.db.collection('projects').orderBy('updatedAt','desc').limit(300).get(),12000);S.projects=q.docs.map(d=>d.data())}
+    catch(e){S.dbErr=e.code==='timeout'?'אין חיבור למסד הנתונים. ודאו שחוקי Realtime Database מאפשרים קריאה וכתיבה.':'לא ניתן לטעון פרויקטים: '+(e.message||e.code);toast(S.dbErr);return}
     try{const q=await S.db.collection('suppliers').limit(1000).get();S.sup={};q.docs.forEach(d=>{S.sup[d.id]=d.data()})}catch(e){}
     try{const v=await S.db.doc('settings/vat').get();if(v.exists&&Array.isArray(v.data().rates))S.vat=v.data().rates}catch(e){}
   }else{S.projects=LS.get('projects')||[];S.sup=LS.get('sup')||{};S.vat=LS.get('vat')||DEFAULT_VAT}
@@ -476,7 +489,7 @@ function listView(){
   const q=S.q.trim();const ps=S.projects.filter(p=>!q||[p.name,p.num,p.company].join(' ').includes(q));
   return `<div class="row" style="justify-content:space-between;margin-bottom:14px"><div><h2>פרויקטים</h2><p class="muted" style="margin:0">כל חשבון סופי הוא פרויקט: מעלים את הדוח, בודקים, מסווגים ומפיקים אקסל.</p></div>
   <button class="pri" id="btnNew">+ חשבון סופי חדש</button></div>
-  ${!S.db?'<p class="chip pdf" style="margin-bottom:10px">מצב מקומי: לא הוגדר Firebase – הנתונים נשמרים בדפדפן זה בלבד והקריאה האוטומטית כבויה</p>':''}
+  ${S.dbErr?`<p class="chip miss" style="margin-bottom:10px">${esc(S.dbErr)}</p>`:''}${!S.db?'<p class="chip pdf" style="margin-bottom:10px">מצב מקומי: לא הוגדר Firebase – הנתונים נשמרים בדפדפן זה בלבד והקריאה האוטומטית כבויה</p>':''}
   <input id="q" placeholder="חיפוש לפי שם, מספר או חברה" value="${esc(S.q)}" style="max-width:420px;margin-bottom:12px">
   ${ps.length?`<div class="tblwrap" style="max-height:none"><table class="list"><thead><tr><th>מס'</th><th>שם הפרויקט</th><th>חברה מבצעת</th><th class="n">סה"כ כולל מע"מ</th><th>שורות</th><th>עודכן</th><th></th></tr></thead><tbody>
   ${ps.map(p=>{const rows=p.rows||[];const t=rows.filter(r=>r.cat!=='skip').reduce((s,r)=>s+(+r.incl||0),0);const un=rows.filter(r=>!r.cat).length;
