@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>בדיקת חשבונות סופיים</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700&family=Assistant:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<style>
+/*
+VOICE: clerical, calm, exact — a ledger desk, not a dashboard.
+IDEA: a municipal cost-analysis form: scan on one side, the clean ledger on the other.
+PICTURE: the working table itself, with the scanned page beside it.
+COLOUR and TYPE: black on white, one mint field (#b8f5d0) for "done/confirmed", amber for "needs you". Rubik headings, Assistant body.
+LAYOUT: top bar + step tabs; each step one full-width working surface; review step splits scan | table.
+*/
+:root{color-scheme:light dark;
+--bg:light-dark(#ffffff,#0f1112);--ink:light-dark(#111416,#eef1f2);--mute:light-dark(#5b6670,#9aa6ae);
+--line:light-dark(#dfe3e6,#2a2f33);--soft:light-dark(#f4f6f7,#171a1c);--mint:light-dark(#b8f5d0,#1f4a33);--mintInk:light-dark(#0b4d2b,#b8f5d0);
+--warn:light-dark(#fff1cc,#4a3a0c);--warnInk:light-dark(#6b4b00,#ffd970);--bad:light-dark(#ffd9d6,#4d1a16);--badInk:light-dark(#8a1a10,#ffb4ab);--acc:light-dark(#111416,#eef1f2)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Assistant,Arial,sans-serif;overflow-x:clip}
+h1,h2,h3{font-family:Rubik,Assistant,sans-serif;margin:0;line-height:1.1}
+h1{font-size:22px}h2{font-size:26px;margin-bottom:6px}h3{font-size:17px}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 14px;min-height:40px}
+button:hover{border-color:var(--ink)}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+button.pri{background:var(--acc);color:var(--bg);border-color:var(--acc);font-weight:700}
+button.ghost{border-color:transparent;background:transparent}
+button.sm{min-height:32px;padding:4px 10px;font-size:14px}
+button:disabled{opacity:.45;cursor:not-allowed}
+input,select,textarea{border:1px solid var(--line);border-radius:6px;padding:7px 9px;background:var(--bg);font-size:16px;width:100%}
+textarea{min-height:64px;resize:vertical}
+.top{display:flex;align-items:center;gap:14px;padding:12px max(3vw,14px);border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:5;flex-wrap:wrap}
+.top .sp{flex:1}.save{font-size:14px;color:var(--mute)}
+.wrap{padding:20px max(3vw,14px) 60px;max-width:1500px;margin:0 auto}
+.muted{color:var(--mute)}.small{font-size:14px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:14px 0 18px;overflow-x:auto}
+.tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:10px 14px;white-space:nowrap;color:var(--mute)}
+.tabs button.on{border-bottom-color:var(--ink);color:var(--ink);font-weight:700}
+.badge{display:inline-block;min-width:22px;padding:0 7px;border-radius:20px;font-size:13px;font-weight:700;margin-inline-start:6px;background:var(--soft)}
+.badge.w{background:var(--warn);color:var(--warnInk)}.badge.ok{background:var(--mint);color:var(--mintInk)}.badge.b{background:var(--bad);color:var(--badInk)}
+table{border-collapse:collapse;width:100%}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:start;vertical-align:middle}
+th{font-size:13px;color:var(--mute);font-weight:600;background:var(--soft);position:sticky;top:0;z-index:1}
+td.n,th.n{text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap;direction:ltr}
+td input,td select{padding:4px 6px;font-size:15px;border-color:transparent;background:transparent}
+td input:hover,td select:hover{border-color:var(--line)}td input:focus,td select:focus{border-color:var(--ink);background:var(--bg)}
+td input.num{text-align:left;direction:ltr;font-variant-numeric:tabular-nums}
+tr.grp td{background:var(--soft);font-weight:600}
+tr.child td:nth-child(2){padding-inline-start:26px}
+tr.ok td:first-child{box-shadow:inset -4px 0 var(--mint)}
+.chip{display:inline-block;font-size:12px;padding:1px 8px;border-radius:12px;background:var(--soft);white-space:nowrap}
+.chip.pdf{background:var(--warn);color:var(--warnInk)}.chip.man{background:var(--mint);color:var(--mintInk)}.chip.miss{background:var(--bad);color:var(--badInk)}
+.chip.sug{background:var(--warn);color:var(--warnInk)}.chip.conf{background:var(--mint);color:var(--mintInk)}
+.drop{border:2px dashed var(--line);border-radius:14px;padding:40px 20px;text-align:center;background:var(--soft)}
+.drop.over{border-color:var(--ink)}
+.pages{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-top:16px}
+.pg{border:1px solid var(--line);border-radius:8px;padding:6px;background:var(--bg);font-size:13px}
+.pg img{width:100%;display:block;border-radius:4px;background:#fff}
+.pg.done{border-color:var(--mintInk)}.pg.err{border-color:var(--badInk)}.pg.run{border-color:var(--warnInk)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr));gap:14px 22px}
+.fld label{display:flex;justify-content:space-between;gap:8px;font-size:14px;color:var(--mute);margin-bottom:4px}
+.split{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:16px;align-items:start}.split.nov{grid-template-columns:minmax(0,1fr)}
+.rt{min-width:1040px}.rt td:nth-child(2){min-width:210px}.rt td:nth-child(3){min-width:150px}.rt td:nth-child(4),.rt td:nth-child(5){min-width:118px}.rt td:nth-child(7){min-width:150px}.rt td:nth-child(9){min-width:120px}
+.viewer{position:sticky;top:70px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--soft)}
+.viewer .bar{display:flex;gap:6px;align-items:center;padding:6px;border-bottom:1px solid var(--line);background:var(--bg);flex-wrap:wrap}
+.viewer .img{height:calc(100vh - 170px);overflow:auto}
+.viewer img{display:block;background:#fff;transform-origin:top right}
+.tblwrap{border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:calc(100vh - 230px)}
+.bar2{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.recon{display:flex;gap:18px;flex-wrap:wrap;padding:10px 14px;border-radius:10px;background:var(--soft);margin-bottom:12px;font-size:15px}
+.recon b{font-variant-numeric:tabular-nums}
+.recon.good{background:var(--mint);color:var(--mintInk)}.recon.diff{background:var(--warn);color:var(--warnInk)}
+.q{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;display:grid;gap:10px}
+.q .h{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.q .opts{display:flex;gap:6px;flex-wrap:wrap}
+.cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin:12px 0 22px}
+.cat{border-radius:10px;padding:12px;background:var(--soft)}.cat b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.list td{cursor:pointer}.list tr:hover td{background:var(--soft)}
+.chk{display:grid;gap:8px;margin:14px 0}
+.chk div{padding:10px 12px;border-radius:8px;background:var(--soft)}
+.chk div.ok{background:var(--mint);color:var(--mintInk)}.chk div.w{background:var(--warn);color:var(--warnInk)}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:20;display:flex;gap:12px;align-items:center;max-width:92vw}
+.toast button{background:transparent;color:var(--bg);border-color:var(--bg);min-height:30px;padding:2px 10px}
+.dlg{position:fixed;inset:0;background:rgba(0,0,0,.4);display:grid;place-items:center;z-index:30;padding:14px}
+.dlg>div{background:var(--bg);border-radius:14px;padding:20px;max-width:560px;width:100%;max-height:90vh;overflow:auto}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.prog{height:8px;background:var(--soft);border-radius:8px;overflow:hidden;margin:10px 0}.prog i{display:block;height:100%;background:var(--mintInk);transition:width .3s}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}.seg button{border:0;border-radius:0;min-height:34px}.seg button.on{background:var(--ink);color:var(--bg)}
+@media(max-width:1000px){.split{grid-template-columns:1fr}.viewer{position:static}.viewer .img{height:60vh}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>בדיקת חשבונות סופיים</h1>
+  <span class="muted small">אגף מבני ציבור</span>
+  <span class="sp"></span>
+  <span class="save" id="saveSt"></span>
+  <span class="small muted" id="who"></span>
+  <button id="btnHome" class="ghost">כל הפרויקטים</button>
+  <button id="btnVat" class="ghost">שיעורי מע"מ</button>
+  <button id="btnOut" class="ghost" hidden>יציאה</button>
+</div>
+<div class="wrap" id="app"><p class="muted">טוען…</p></div>
+<div id="layer"></div>
+
+<!-- ============ הגדרות – למלא אחרי יצירת פרויקט Firebase ============ -->
+<script>
+window.FA_CONFIG = {
+  // Firebase console > Project settings > General > Your apps > Web app > SDK setup and configuration (Config)
+  firebase: {
+    apiKey: "",
+    authDomain: "",
+    projectId: "",
+    storageBucket: "",
+    messagingSenderId: "",
+    appId: ""
+  },
+  // App Check (reCAPTCHA v3 site key) – נדרש לקריאה האוטומטית דרך Firebase AI Logic
+  recaptchaSiteKey: "",
+  // מודל Gemini לקריאת הסריקות (ניתן להחליף לגרסה עדכנית יותר)
+  aiModel: "gemini-3.8-flash"
+};
+</script>
+<script type="module">
+const C = window.FA_CONFIG, B = "https://www.gstatic.com/firebasejs/12.18.0/";
+window.FA_BACKEND = (async () => {
+  if (!C.firebase || !C.firebase.apiKey) return { mode: "local" };
+  const { initializeApp } = await import(B + "firebase-app.js");
+  const fs = await import(B + "firebase-firestore.js");
+  const au = await import(B + "firebase-auth.js");
+  const app = initializeApp(C.firebase);
+  if (C.recaptchaSiteKey) {
+    try { const ac = await import(B + "firebase-app-check.js");
+      ac.initializeAppCheck(app, { provider: new ac.ReCaptchaV3Provider(C.recaptchaSiteKey), isTokenAutoRefreshEnabled: true }); }
+    catch (e) { console.warn("App Check", e); }
+  }
+  const db = fs.getFirestore(app), auth = au.getAuth(app);
+  const wrap = s => ({ id: s.id, exists: s.exists(), data: () => s.data() });
+  const q = (path, mods) => ({
+    orderBy: (f, d) => q(path, [...mods, fs.orderBy(f, d || "asc")]),
+    limit: n => q(path, [...mods, fs.limit(n)]),
+    get: async () => { const r = await fs.getDocs(fs.query(fs.collection(db, path), ...mods)); return { docs: r.docs.map(wrap) }; }
+  });
+  const dbA = {
+    collection: p => q(p, []),
+    doc: p => ({ get: async () => wrap(await fs.getDoc(fs.doc(db, p))), set: d => fs.setDoc(fs.doc(db, p), d), delete: () => fs.deleteDoc(fs.doc(db, p)) })
+  };
+  let sample = null;
+  try {
+    const ai = await import(B + "firebase-ai.js");
+    const model = ai.getGenerativeModel(ai.getAI(app, { backend: new ai.GoogleAIBackend() }),
+      { model: C.aiModel || "gemini-3.8-flash", generationConfig: { responseMimeType: "application/json", temperature: 0 } });
+    const b64 = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(blob); });
+    sample = async (prompt, opt) => {
+      const parts = [prompt];
+      for (const im of (opt && opt.images) || []) parts.push({ inlineData: { data: await b64(im), mimeType: "image/jpeg" } });
+      const r = await model.generateContent(parts);
+      return { text: r.response.text() };
+    };
+    sample.limits = async () => ({ images: true });
+  } catch (e) { console.warn("AI Logic", e); }
+  return { mode: "firebase", db: dbA, sample, auth: {
+    onChange: cb => au.onAuthStateChanged(auth, cb),
+    signIn: (e, p) => au.signInWithEmailAndPassword(auth, e, p),
+    signOut: () => au.signOut(auth),
+    reset: e => au.sendPasswordResetEmail(auth, e)
+  } };
+})();
+</script>
+
+<script>
+/* ===== EXPORT (pure; also tested outside the page) ===== */
+const CATS={exec:'ביצוע (קבלן)',plan:'תכנון ויועצים',mgmt:'ניהול ופיקוח',fee:'עמלת חברה מנהלת',levy:'אגרות, היטלים ומעבדות',skip:'לא לכלול'};
+function normName(s){return String(s||'').replace(/בע["״']?מ/g,'').replace(/["'״׳.,\-()]/g,'').replace(/\s+/g,' ').trim()}
+function gkey(r){return normName(r.sup)+'|'+normName(r.svc)}
+function fmtD(iso){if(!iso)return'';const m=String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${m[3]}/${m[2]}/${m[1]}`:String(iso)}
+function fmtDT(d){const p=n=>String(n).padStart(2,'0');return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`}
+function vatFor(iso,rates){let r=rates[0]?rates[0].rate:18;for(const x of [...rates].sort((a,b)=>a.from<b.from?-1:1)){if(!iso||x.from<=iso)r=x.rate}return r}
+function buildLines(P,grouped){
+  const L={exec:[],plan:[],mgmt:[],fee:[],levy:[]};
+  const rows=(P.rows||[]).filter(r=>r.cat&&r.cat!=='skip'&&L[r.cat]);
+  if(!grouped){rows.forEach(r=>L[r.cat].push({sup:r.sup,svc:r.svc,excl:+r.excl||0,incl:+r.incl||0,note:r.note||''}));return L}
+  const m=new Map();
+  rows.forEach(r=>{const k=r.cat+'§'+gkey(r);if(!m.has(k)){const o={sup:r.sup,svc:r.svc,excl:0,incl:0,n:0,notes:[]};m.set(k,o);L[r.cat].push(o)}const o=m.get(k);o.excl+=+r.excl||0;o.incl+=+r.incl||0;o.n++;if(r.note)o.notes.push(r.note)});
+  for(const k in L)L[k].forEach(o=>{o.note=(o.n>1?`מאוחד מ-${o.n} שורות`:'')+(o.notes.length?(o.n>1?'; ':'')+o.notes.join('; '):'')});
+  return L;
+}
+function buildWB(ExcelJS,P,opt){
+  opt=opt||{};const vat=(opt.vat||18)/100;
+  const wb=new ExcelJS.Workbook();wb.creator='בדיקת חשבונות סופיים';
+  const ws=wb.addWorksheet('ניתוח עלויות',{views:[{rightToLeft:true,showGridLines:false}],pageSetup:{paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0}});
+  ws.columns=[{width:7},{width:17},{width:9},{width:40},{width:26},{width:20},{width:16},{width:16},{width:13},{width:13},{width:36}];
+  const FN='David',thin={style:'thin',color:{argb:'FF8C969F'}},box={top:thin,left:thin,bottom:thin,right:thin};
+  const fill=c=>({type:'pattern',pattern:'solid',fgColor:{argb:c}});
+  const C=(a,v,s)=>{const c=ws.getCell(a);c.value=v;c.font={name:FN,size:12,...(s&&s.font||{})};c.alignment={vertical:'middle',horizontal:(s&&s.h)||'right',wrapText:true,readingOrder:'rtl'};if(s&&s.fill)c.fill=fill(s.fill);if(s&&s.fmt)c.numFmt=s.fmt;if(!(s&&s.nob))c.border=box;return c};
+  const NUM='#,##0',PCT='0.00%',HEAD='FFD9E2EA',SEC='FFEEF2F5',TOT='FFFFF2CC',BIG='FFB8F5D0';
+  const L=buildLines(P,opt.grouped!==false);
+  const upd=new Date(P.updatedAt||Date.now());
+  C('K1','עדכון אחרון: '+fmtDT(upd),{font:{size:10,italic:true},h:'left',nob:true});
+  ws.mergeCells('A3:K3');
+  C('A3',`פרויקט מס' ${P.num||'—'} - ${P.name||''} - טבלת חישוב עלויות על בסיס חשבון סופי${P.finalDate?' מתאריך '+fmtD(P.finalDate):''}`,{font:{size:16,bold:true},h:'center',nob:true});
+  ws.getRow(3).height=26;
+  const hdr=['מס"ד','פרק','מס"ד שניוני','תאור','תפקיד בפרויקט','שיוך','ערך\\ עלות ללא מע"מ','ערך\\ עלות כולל מע"מ','אחוז מעלות הפרויקט (PRICE)','אחוז מעלות הביצוע (COST)','הערות'];
+  hdr.forEach((h,i)=>C(String.fromCharCode(65+i)+'5',h,{font:{bold:true},fill:HEAD,h:'center'}));ws.getRow(5).height=34;
+  let r=6;
+  const secTitle=t=>{ws.mergeCells(`A${r}:K${r}`);C(`A${r}`,t,{font:{bold:true,size:13},fill:SEC});r++};
+  secTitle('נתונים כלליים');
+  const gen=[['שם הפרויקט',P.name],['תיאור הפרויקט (תכולה)',P.desc],['שטח בניה עפ"י היתר (מ"ר)',P.area?+P.area:''],['חברה מבצעת',P.company],['מנהל פרויקט הנדסי',P.pm],['תאריך חשבון סופי',P.finalDate],['תאריך מסירה',P.deliveryDate],['מדד תשומות הבנייה עפ"י תאריך החשבון הסופי',P.index?+P.index:'']];
+  const g0=r;let areaRow=0;
+  gen.forEach((g,i)=>{let v=g[1]==null?'':g[1];let fmt;if(i===5||i===6){const m=String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);if(m){v=new Date(Date.UTC(+m[1],+m[2]-1,+m[3]));fmt='dd/mm/yyyy'}}if(i===2){areaRow=r;fmt='#,##0.00'}
+    C(`C${r}`,'1.'+(i+1),{h:'center'});C(`D${r}`,g[0]);ws.mergeCells(`E${r}:J${r}`);C(`E${r}`,v,{fmt});C(`K${r}`,'');r++});
+  ws.mergeCells(`A${g0}:A${r-1}`);C(`A${g0}`,1,{h:'center'});ws.mergeCells(`B${g0}:B${r-1}`);C(`B${g0}`,'נתונים כלליים',{h:'center'});
+  const pctCells=[];const T={};
+  const secDef=[['exec',2,'עלויות ביצוע (COST)','ביצוע'],['plan',3,'עלויות תכנון','תכנון'],['mgmt',4,'עלויות ניהול ופיקוח','ניהול ופיקוח הנדסי'],['fee',5,'עמלת חברה עירונית','ניהול כולל של הפרויקט'],['levy',6,'אגרות, היטלים, מעבדות, מכון בקרה וכד\'','אגרות וכו\'']];
+  const sums={};
+  secDef.forEach(([k,no,title,flab])=>{
+    secTitle(title);
+    const lines=L[k].length?L[k]:[{sup:'—',svc:'',excl:0,incl:0,note:'אין שורות בפרק'}];
+    const s0=r;let se=0,si=0;
+    lines.forEach((l,i)=>{C(`C${r}`,`${no}.${i+1}`,{h:'center'});C(`D${r}`,l.sup||'');C(`E${r}`,l.svc||'');C(`F${r}`,flab);
+      C(`G${r}`,Math.round((+l.excl||0)*100)/100,{fmt:NUM,h:'left'});C(`H${r}`,Math.round((+l.incl||0)*100)/100,{fmt:NUM,h:'left'});
+      C(`I${r}`,null,{fmt:PCT,h:'left'});C(`J${r}`,null,{fmt:PCT,h:'left'});C(`K${r}`,l.note||'',{font:{size:10}});
+      pctCells.push([r,+l.incl||0]);se+=+l.excl||0;si+=+l.incl||0;r++});
+    ws.mergeCells(`A${s0}:A${r-1}`);C(`A${s0}`,no,{h:'center'});ws.mergeCells(`B${s0}:B${r-1}`);C(`B${s0}`,title,{h:'center'});
+    ws.mergeCells(`A${r}:F${r}`);C(`A${r}`,'סה"כ '+title,{font:{bold:true},fill:TOT});
+    C(`G${r}`,{formula:`SUM(G${s0}:G${r-1})`,result:se},{fmt:NUM,font:{bold:true},fill:TOT,h:'left'});
+    C(`H${r}`,{formula:`SUM(H${s0}:H${r-1})`,result:si},{fmt:NUM,font:{bold:true},fill:TOT,h:'left'});
+    C(`I${r}`,null,{fmt:PCT,font:{bold:true},fill:TOT,h:'left'});C(`J${r}`,null,{fmt:PCT,font:{bold:true},fill:TOT,h:'left'});C(`K${r}`,'',{fill:TOT});
+    T[k]={row:r,s0,s1:r-1};sums[k]={e:se,i:si};r++;
+  });
+  const ovE=sums.plan.e+sums.mgmt.e+sums.fee.e+sums.levy.e,ovI=sums.plan.i+sums.mgmt.i+sums.fee.i+sums.levy.i;
+  const totE=sums.exec.e+ovE,totI=sums.exec.i+ovI;
+  const ovR=r;ws.mergeCells(`A${r}:F${r}`);C(`A${r}`,'סה"כ תקורות (תכנון, ניהול, פיקוח, אגרות, היטלים ועמלה)',{font:{bold:true},fill:TOT});
+  const ovs=['plan','mgmt','fee','levy'].map(k=>T[k].row);
+  C(`G${r}`,{formula:ovs.map(x=>'G'+x).join('+'),result:ovE},{fmt:NUM,font:{bold:true},fill:TOT,h:'left'});
+  C(`H${r}`,{formula:ovs.map(x=>'H'+x).join('+'),result:ovI},{fmt:NUM,font:{bold:true},fill:TOT,h:'left'});
+  C(`I${r}`,{formula:ovs.map(x=>'I'+x).join('+'),result:totI?ovI/totI:0},{fmt:PCT,font:{bold:true},fill:TOT,h:'left'});
+  C(`J${r}`,{formula:ovs.map(x=>'J'+x).join('+'),result:sums.exec.i?ovI/sums.exec.i:0},{fmt:PCT,font:{bold:true},fill:TOT,h:'left'});C(`K${r}`,'',{fill:TOT});r++;
+  const prR=r;ws.mergeCells(`A${r}:F${r}`);C(`A${r}`,'סה"כ עלות הפרויקט (PRICE)',{font:{bold:true,size:13},fill:BIG});
+  C(`G${r}`,{formula:`G${T.exec.row}+G${ovR}`,result:totE},{fmt:NUM,font:{bold:true},fill:BIG,h:'left'});
+  C(`H${r}`,{formula:`H${T.exec.row}+H${ovR}`,result:totI},{fmt:NUM,font:{bold:true},fill:BIG,h:'left'});
+  C(`I${r}`,{formula:`I${T.exec.row}+I${ovR}`,result:totI?1:0},{fmt:PCT,font:{bold:true},fill:BIG,h:'left'});
+  C(`J${r}`,{formula:`J${T.exec.row}+J${ovR}`,result:sums.exec.i?totI/sums.exec.i:0},{fmt:PCT,font:{bold:true},fill:BIG,h:'left'});C(`K${r}`,'',{fill:BIG});r++;
+  const xr=T.exec.row,pr=prR;
+  const pctF=(row,v)=>{ws.getCell(`I${row}`).value={formula:`IFERROR(H${row}/$H$${pr},0)`,result:totI?v/totI:0};ws.getCell(`J${row}`).value={formula:`IFERROR(H${row}/$H$${xr},0)`,result:sums.exec.i?v/sums.exec.i:0}};
+  pctCells.forEach(([row,v])=>pctF(row,v));
+  secDef.forEach(([k])=>{const t=T[k];ws.getCell(`I${t.row}`).value={formula:`SUM(I${t.s0}:I${t.s1})`,result:totI?sums[k].i/totI:0};ws.getCell(`J${t.row}`).value={formula:`SUM(J${t.s0}:J${t.s1})`,result:sums.exec.i?sums[k].i/sums.exec.i:0}});
+  r++;secTitle('ריכוז נתונים');
+  const sm=[['סה"כ עלויות ביצוע (COST)',xr,sums.exec],['סה"כ עלויות תכנון',T.plan.row,sums.plan],['סה"כ עלויות ניהול ופיקוח',T.mgmt.row,sums.mgmt],['סה"כ עמלת חברה עירונית',T.fee.row,sums.fee],['סה"כ אגרות, היטלים, מעבדות, מכון בקרה וכד\'',T.levy.row,sums.levy],['סה"כ תקורות (תכנון, ניהול, פיקוח, אגרות, היטלים ועמלה)',ovR,{e:ovE,i:ovI}],['סה"כ עלות הפרויקט (PRICE)',prR,{e:totE,i:totI}]];
+  const z0=r;
+  sm.forEach(([t,src,v],i)=>{const last=i===sm.length-1;const st=last?{font:{bold:true},fill:BIG}:{};
+    C(`C${r}`,'7.'+(i+1),{h:'center',...st});ws.mergeCells(`D${r}:F${r}`);C(`D${r}`,t,st);
+    C(`G${r}`,{formula:`G${src}`,result:v.e},{fmt:NUM,h:'left',...st});C(`H${r}`,{formula:`H${src}`,result:v.i},{fmt:NUM,h:'left',...st});
+    C(`I${r}`,{formula:`I${src}`,result:totI?v.i/totI:0},{fmt:PCT,h:'left',...st});C(`J${r}`,{formula:`J${src}`,result:sums.exec.i?v.i/sums.exec.i:0},{fmt:PCT,h:'left',...st});C(`K${r}`,'',st);r++});
+  ws.mergeCells(`A${z0}:A${r-1}`);C(`A${z0}`,7,{h:'center'});ws.mergeCells(`B${z0}:B${r-1}`);C(`B${z0}`,'ריכוז נתונים',{h:'center'});
+  r++;secTitle('ניתוח נתונים - עלות מ"ר בניה');
+  const h1=r;
+  ['A','B','C'].forEach(c=>ws.mergeCells(`${c}${r}:${c}${r+1}`));ws.mergeCells(`D${r}:F${r+1}`);
+  C(`A${r}`,'מס"ד',{font:{bold:true},fill:HEAD,h:'center'});C(`B${r}`,'פרק',{font:{bold:true},fill:HEAD,h:'center'});C(`C${r}`,'מס"ד שניוני',{font:{bold:true},fill:HEAD,h:'center'});C(`D${r}`,'תאור',{font:{bold:true},fill:HEAD,h:'center'});
+  ws.mergeCells(`G${r}:H${r}`);C(`G${r}`,'עלות פרויקטלית (PRICE)',{font:{bold:true},fill:HEAD,h:'center'});ws.mergeCells(`I${r}:J${r}`);C(`I${r}`,'עלות קבלנית (COST)',{font:{bold:true},fill:HEAD,h:'center'});
+  ws.mergeCells(`K${r}:K${r+1}`);C(`K${r}`,'הערות',{font:{bold:true},fill:HEAD,h:'center'});r++;
+  ['ללא מע"מ','כולל מע"מ','ללא מע"מ','כולל מע"מ'].forEach((t,i)=>C(String.fromCharCode(71+i)+r,t,{font:{bold:true},fill:HEAD,h:'center'}));r++;
+  const a=+P.area||0,dv=+P.devArea||0,dc=+P.devCost||900,bnm=1+(+P.bnm||15)/100;
+  const a0=r,A1=r,A2=r+1,A3=r+2,A4=r+3,A5=r+4,A6=r+5,A7=r+6;
+  const ratio=a?dv/a:0,p4=[a?totE/a:0,a?totI/a:0,a?sums.exec.e/a:0,a?sums.exec.i/a:0],d5=dc*ratio,d5i=d5*(1+vat);
+  const L8=[
+    ['שטח הפרויקט עפ"י היתר הבניה (מ"ר)',{G:{formula:`E${areaRow}`,result:a}},'',],
+    ['שטח הפיתוח בפרויקט (מ"ר)',{G:dv||null},dv?'':'להשלמה'],
+    ['יחס שטח פיתוח/שטח בניה',{G:{formula:`IFERROR(G${A2}/G${A1},0)`,result:ratio}},''],
+    ['עלות למ"ר בינוי + פיתוח (₪/מ"ר)',{G:{formula:`IFERROR(G${prR}/G${A1},0)`,result:p4[0]},H:{formula:`IFERROR(H${prR}/G${A1},0)`,result:p4[1]},I:{formula:`IFERROR(G${xr}/G${A1},0)`,result:p4[2]},J:{formula:`IFERROR(H${xr}/G${A1},0)`,result:p4[3]}},'עלויות / שטח מבנה'],
+    ['עלות פיתוח המועמסת על 1 מ"ר בניה (₪/מ"ר)',{I:{formula:`${dc}*G${A3}`,result:d5},J:{formula:`I${A5}*${1+vat}`,result:d5i}},`הנחת עבודה - עלות מ"ר פיתוח ${dc} ₪/מ"ר`],
+    ['עלות למ"ר בינוי בסיסי (₪/מ"ר)',{I:{formula:`I${A4}-I${A5}`,result:p4[2]-d5},J:{formula:`J${A4}-J${A5}`,result:p4[3]-d5i}},'עפ"י חישוב'],
+    [`עלות למ"ר בינוי בסיסי בניכוי ב.נ.מ. ${Math.round((bnm-1)*100)}% (₪/מ"ר)`,{I:{formula:`I${A6}/${bnm}`,result:(p4[2]-d5)/bnm},J:{formula:`J${A6}/${bnm}`,result:(p4[3]-d5i)/bnm}},'עפ"י חישוב - נכון ליום אישור החשבון הסופי (לא מהוון)']];
+  L8.forEach(([t,vals,note],i)=>{C(`C${r}`,'8.'+(i+1),{h:'center'});ws.mergeCells(`D${r}:F${r}`);C(`D${r}`,t);
+    ['G','H','I','J'].forEach(c=>C(`${c}${r}`,vals[c]===undefined?null:vals[c],{fmt:i===2?'0.00':'#,##0',h:'left'}));C(`K${r}`,note,{font:{size:10}});r++});
+  ws.mergeCells(`A${a0}:A${r-1}`);C(`A${a0}`,8,{h:'center'});ws.mergeCells(`B${a0}:B${r-1}`);C(`B${a0}`,'עלות מ"ר בניה',{h:'center'});
+  /* detail sheet */
+  const d=wb.addWorksheet('פירוט שורות מהדוח',{views:[{rightToLeft:true,state:'frozen',ySplit:3}]});
+  d.columns=[{width:6},{width:7},{width:36},{width:26},{width:18},{width:15},{width:15},{width:9},{width:11},{width:8},{width:34}];
+  const D=(a,v,s)=>{const c=d.getCell(a);c.value=v;c.font={name:FN,size:11,...(s&&s.font||{})};c.alignment={vertical:'middle',horizontal:(s&&s.h)||'right',wrapText:true};if(s&&s.fill)c.fill=fill(s.fill);if(s&&s.fmt)c.numFmt=s.fmt;c.border=box;return c};
+  d.getCell('K1').value='עדכון אחרון: '+fmtDT(upd);d.getCell('K1').font={name:FN,size:10,italic:true};
+  d.mergeCells('A1:H1');d.getCell('A1').value=`פירוט שורות כפי שנקלטו מהחשבון הסופי - ${P.name||''}`;d.getCell('A1').font={name:FN,size:14,bold:true};
+  ['#','עמוד','שם ספק','סוג שירות','שיוך','ללא מע"מ','כולל מע"מ','מע"מ %','מחושב','נבדק','הערה'].forEach((h,i)=>D(String.fromCharCode(65+i)+'3',h,{font:{bold:true},fill:HEAD,h:'center'}));
+  let k=4;(P.rows||[]).forEach((x,i)=>{D('A'+k,i+1,{h:'center'});D('B'+k,x.page||'',{h:'center'});D('C'+k,x.sup||'');D('D'+k,x.svc||'');D('E'+k,CATS[x.cat]||'לא משויך',x.cat?{}:{fill:'FFFFD9D6'});
+    D('F'+k,+x.excl||0,{fmt:'#,##0.00',h:'left'});D('G'+k,+x.incl||0,{fmt:'#,##0.00',h:'left'});D('H'+k,x.rate!=null?x.rate+'%':'',{h:'center'});D('I'+k,x.calc==='excl'?'ללא מע"מ':x.calc==='incl'?'כולל מע"מ':'',{h:'center'});D('J'+k,x.ok?'✓':'',{h:'center'});D('K'+k,x.note||'');k++});
+  const f1=4,f2=k-1;
+  d.mergeCells(`A${k}:E${k}`);D('A'+k,'סה"כ שורות (ללא "לא לכלול")',{font:{bold:true},fill:TOT});
+  const incl=(P.rows||[]).filter(x=>x.cat!=='skip');
+  D('F'+k,{formula:`SUMIF(E${f1}:E${f2},"<>לא לכלול",F${f1}:F${f2})`,result:incl.reduce((s,x)=>s+(+x.excl||0),0)},{fmt:'#,##0.00',font:{bold:true},fill:TOT,h:'left'});
+  D('G'+k,{formula:`SUMIF(E${f1}:E${f2},"<>לא לכלול",G${f1}:G${f2})`,result:incl.reduce((s,x)=>s+(+x.incl||0),0)},{fmt:'#,##0.00',font:{bold:true},fill:TOT,h:'left'});k++;
+  if(P.reportIncl||P.reportExcl){d.mergeCells(`A${k}:E${k}`);D('A'+k,'סה"כ לפי הדוח',{font:{bold:true}});D('F'+k,+P.reportExcl||null,{fmt:'#,##0.00',h:'left'});D('G'+k,+P.reportIncl||null,{fmt:'#,##0.00',h:'left'});k++;
+    d.mergeCells(`A${k}:E${k}`);D('A'+k,'הפרש',{font:{bold:true}});D('F'+k,P.reportExcl?{formula:`F${k-2}-F${k-1}`}:null,{fmt:'#,##0.00',h:'left'});D('G'+k,P.reportIncl?{formula:`G${k-2}-G${k-1}`}:null,{fmt:'#,##0.00',h:'left'})}
+  return wb;
+}
+/* ===== END EXPORT ===== */
+</script>
+
+<script>
+{
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>(n==null||n===''||isNaN(n))?'':Number(n).toLocaleString('he-IL',{minimumFractionDigits:2,maximumFractionDigits:2});
+const money0=n=>Number(n||0).toLocaleString('he-IL',{maximumFractionDigits:0});
+const num=v=>{if(v==null||v==='')return null;const n=Number(String(v).replace(/[^\d.\-]/g,''));return isNaN(n)?null:n};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const hash=s=>{let h=2166136261;for(const c of String(s)){h^=c.codePointAt(0);h=Math.imul(h,16777619)>>>0}return 'k'+h.toString(36)};
+const DEFAULT_VAT=[{from:'2012-09-01',rate:17},{from:'2013-06-02',rate:18},{from:'2015-10-01',rate:17},{from:'2025-01-01',rate:18}];
+const FIELDS=[['num','מס\' פרויקט',0],['name','שם הפרויקט',1],['desc','תיאור הפרויקט (תכולה)',1,'ta'],['area','שטח בניה עפ"י היתר (מ"ר)',1,'num'],['devArea','שטח פיתוח (מ"ר)',0,'num'],['company','חברה מבצעת',1],['pm','מנהל פרויקט הנדסי',0],['finalDate','תאריך חשבון סופי',1,'date'],['deliveryDate','תאריך מסירה',1,'date'],['index','מדד תשומות הבנייה בתאריך החשבון',0,'num'],['devCost','עלות פיתוח למ"ר (הנחת עבודה)',0,'num'],['bnm','ב.נ.מ. לניכוי (%)',0,'num']];
+const S={view:'list',projects:[],P:null,sup:{},vat:DEFAULT_VAT,pages:[],tab:'read',grouped:true,open:{},db:null,sample:null,dl:null,q:'',zoom:1,pageSel:0,reading:false,undo:null,expGrouped:true};
+let saveT=null,saving=false,dirty=false;
+
+/* ---------- storage ---------- */
+const LS={get(k){try{return JSON.parse(localStorage.getItem('fa_'+k))}catch(e){return null}},set(k,v){try{localStorage.setItem('fa_'+k,JSON.stringify(v))}catch(e){}}};
+async function loadAll(){
+  if(S.db){
+    try{const q=await S.db.collection('projects').orderBy('updatedAt','desc').limit(300).get();S.projects=q.docs.map(d=>d.data())}catch(e){toast('לא ניתן לטעון פרויקטים: '+(e.message||e.code))}
+    try{const q=await S.db.collection('suppliers').limit(1000).get();S.sup={};q.docs.forEach(d=>{S.sup[d.id]=d.data()})}catch(e){}
+    try{const v=await S.db.doc('settings/vat').get();if(v.exists&&Array.isArray(v.data().rates))S.vat=v.data().rates}catch(e){}
+  }else{S.projects=LS.get('projects')||[];S.sup=LS.get('sup')||{};S.vat=LS.get('vat')||DEFAULT_VAT}
+}
+function touch(){if(!S.P)return;S.P.updatedAt=Date.now();dirty=true;$('#saveSt').textContent='שינויים לא שמורים…';clearTimeout(saveT);saveT=setTimeout(save,1200)}
+async function save(){
+  if(!S.P||saving){if(saving){clearTimeout(saveT);saveT=setTimeout(save,800)}return}
+  saving=true;dirty=false;const P=JSON.parse(JSON.stringify(S.P));
+  try{
+    if(S.db)await S.db.doc('projects/'+P.id).set(P);
+    else{const a=(LS.get('projects')||[]).filter(x=>x.id!==P.id);a.unshift(P);LS.set('projects',a)}
+    const i=S.projects.findIndex(x=>x.id===P.id);if(i>=0)S.projects[i]=P;else S.projects.unshift(P);
+    $('#saveSt').textContent='נשמר '+fmtDT(new Date()).slice(11);
+  }catch(e){$('#saveSt').textContent='השמירה נכשלה';toast(e.code==='quota_exceeded'?'אין מקום לשמירה: '+e.message:'השמירה נכשלה, ננסה שוב');dirty=true;setTimeout(save,4000)}
+  saving=false;
+}
+async function rememberSupplier(r,cat){
+  const keys=[hash(normName(r.sup)+'|'+normName(r.svc)),hash(normName(r.sup))];
+  const body={sup:r.sup,svc:r.svc,cat,at:Date.now()};
+  for(const k of keys){S.sup[k]={...body,svc:k===keys[1]?'':r.svc};
+    if(S.db){try{await S.db.doc('suppliers/'+k).set(S.sup[k])}catch(e){}}}
+  if(!S.db)LS.set('sup',S.sup);
+}
+async function saveVat(){if(S.db){try{await S.db.doc('settings/vat').set({rates:S.vat})}catch(e){toast('לא נשמר')}}else LS.set('vat',S.vat)}
+
+/* ---------- classification ---------- */
+const RULES=[
+ ['fee',/עמלת|עמלה|עו["״]?ב|תקורה/],
+ ['levy',/חברת ה?חשמל|חח["״]?י|מי אביבים|תאגיד מים|רשות|עירי|מכון התקנים|כבאות|כיבוי|אגרה|אגרות|היטל|פיצוי נופי|מעבד|מכון בקרה|התעדה|דמי הקמה|רשות העתיקות|בזק/],
+ ['mgmt',/ניהול פרו|מנהל פרו|ניהול ופיקוח|^פיקוח|ניהול פרויקט/],
+ ['exec',/קבלן|ביצוע|התייקרות|ביטוח|ניקיון|גיזום|כ["״]?א|כוח אדם|עבודות/],
+ ['plan',/אדריכל|יועץ|ייעוץ|יעוץ|תכנון|קונסטרוק|שלד|אינסטלצ|חשמל|תקשורת|מיזוג|אקוסטי|מודד|מדידות|נגישות|בטיחות|מיגון|העתקות|צילום|צלם|הידרולוג|קרקע|גאוטכני|איטום|תנועה|בני.?ה ירוקה|אגרונום|מעלי|כמאי|הדמי|תאום|תיאום|סופרפוזיציה|נוף|תברואה|מתזים|פרוגרמה|מטבח|תשתיות|קרינה|מהנדס/]];
+function suggest(r,ai){
+  const d=S.sup[hash(normName(r.sup)+'|'+normName(r.svc))]||S.sup[hash(normName(r.sup))];
+  if(d&&d.cat)return {cat:d.cat,src:'dict'};
+  const txt=(r.svc||'')+' '+(r.sup||'');
+  for(const [c,re] of RULES){if(re.test(r.svc||'')||(c==='levy'||c==='fee')&&re.test(r.sup||''))return {cat:c,src:'rule'}}
+  if(ai&&ai.cat&&ai.cat!=='unknown'&&ai.conf>=0.8)return {cat:ai.cat,src:'ai'};
+  for(const [c,re] of RULES){if(re.test(txt))return {cat:c,src:'rule'}}
+  return {cat:'',src:''};
+}
+function classifyAll(onlyEmpty=true){(S.P.rows||[]).forEach(r=>{if(onlyEmpty&&r.cat)return;const s=suggest(r,r.ai);r.cat=s.cat;r.catSrc=s.src})}
+
+/* ---------- VAT ---------- */
+function projVat(){return S.P.vatOverride?+S.P.vatOverride:vatFor(S.P.finalDate,S.vat)}
+function fixVat(r){
+  const rate=r.rate!=null?+r.rate:projVat(),rd=x=>Math.round(x*100)/100;
+  if(r.calc!=='excl'&&r.calc!=='incl'){if(r.excl==null&&r.incl!=null)r.calc='excl';else if(r.incl==null&&r.excl!=null)r.calc='incl';else return}
+  if(r.calc==='excl'){if(r.incl==null){r.excl=null;r.calc='';return}r.excl=rd(r.incl/(1+rate/100))}
+  else{if(r.excl==null){r.incl=null;r.calc='';return}r.incl=rd(r.excl*(1+rate/100))}
+}
+function implied(r){if(!r.excl||!r.incl)return null;return (r.incl/r.excl-1)*100}
+function vatFlag(r){const i=implied(r);if(i==null||r.calc)return '';const known=[...new Set(S.vat.map(x=>x.rate))];return known.some(k=>Math.abs(i-k)<0.15)?'':'⚠'}
+
+/* ---------- PDF ---------- */
+async function loadPdf(file){
+  if(!window.pdfjsLib){toast('רכיב קריאת PDF לא נטען');return}
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const buf=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  S.pages.forEach(p=>URL.revokeObjectURL(p.url));S.pages=[];
+  for(let i=1;i<=pdf.numPages;i++){
+    const page=await pdf.getPage(i);const v0=page.getViewport({scale:1});const sc=Math.min(2.4,1700/v0.width);
+    const vp=page.getViewport({scale:sc});const cv=document.createElement('canvas');cv.width=vp.width;cv.height=vp.height;
+    const cx=cv.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,cv.width,cv.height);
+    await page.render({canvasContext:cx,viewport:vp}).promise;
+    const blob=await new Promise(res=>cv.toBlob(res,'image/jpeg',0.85));
+    S.pages.push({n:i,blob,url:URL.createObjectURL(blob),use:true,st:''});
+    render();
+  }
+  if(S.P){S.P.pdfName=file.name;S.P.pages=pdf.numPages;touch()}
+  render();
+}
+const PROMPT=(p,n)=>`You are reading page ${p} of ${n} of a scanned Israeli municipal "final account" (חשבון סופי / דרישת תשלום סופית) for a public-building project. Extract data exactly as printed and return ONLY one JSON object, no prose, no code fences:
+{"page_kind":"cover_letter|supplier_table|approval|other",
+ "project":{"number":null,"name":null,"description":null,"company":null,"project_manager":null,"final_account_date":null,"delivery_date":null,"area_sqm":null},
+ "rows":[{"supplier":"","service":"","amount_excl_vat":null,"amount_incl_vat":null,"category":"execution|planning|management|fee|levies|unknown","confidence":0.0,"note":""}],
+ "total_excl_vat":null,"total_incl_vat":null,"warnings":""}
+Rules:
+- One row per printed supplier line, top to bottom, including repeated suppliers. Copy Hebrew names exactly as printed (keep בע"מ). Use "" for a blank cell.
+- Amounts are plain numbers without commas. Take the FINAL CUMULATIVE amount that INCLUDES the current demand: amount_excl_vat from the cumulative column before VAT ("לפני מע\"מ" / "ללא מע\"מ"), amount_incl_vat from the cumulative column including VAT ("כולל מע\"מ"). A column titled "מצטבר ללא דרישה נוכחית" is cumulative WITHOUT the current demand — never use it. If only one cumulative amount exists for a line, fill it and set the other to null.
+- Total lines (סה"כ, סה"כ כללי, תקציב מאושר, אחוז ניצול) are NOT rows: put the grand total of the table in total_excl_vat / total_incl_vat.
+- A fee line of the managing company (e.g. "עמלת עו\"ב 4%", "עמלת אחוזות החוף", "תקורה") IS a row, category "fee"; if it has no supplier name put the line text in supplier.
+- category: execution = building contractor and construction-phase costs (קבלן ביצוע, התייקרות, ביטוח ביצוע, ניקיון, כוח אדם באתר); planning = architects, engineers, consultants, surveyors, copying, photography; management = project management / supervision; fee = managing-company fee; levies = authorities, utilities, fees, labs, certification (חברת החשמל, מי אביבים, עירייה, כבאות, מכון התקנים, מעבדה, רשות העתיקות). confidence 0..1.
+- project fields only when printed on this page; dates as DD/MM/YYYY; "project number" is the municipal project number (מס' פרויקט).
+- Ignore stamps and handwriting unless they are the only source of a value. Never guess unreadable digits: use null and explain in note.
+- If the page has no supplier table, return "rows": [].`;
+function parseJSON(t){t=String(t||'').replace(/```json|```/g,'');const a=t.indexOf('{'),b=t.lastIndexOf('}');if(a<0||b<a)throw new Error('no json');return JSON.parse(t.slice(a,b+1))}
+const CATMAP={execution:'exec',planning:'plan',management:'mgmt',fee:'fee',levies:'levy'};
+function toISO(s){if(!s)return '';const m=String(s).match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);if(!m)return '';let y=+m[3];if(y<100)y+=2000;return `${y}-${String(+m[2]).padStart(2,'0')}-${String(+m[1]).padStart(2,'0')}`}
+async function readPdf(){
+  if(!S.sample){toast('קריאה אוטומטית לא זמינה כאן – אפשר להקליד שורות ידנית');return}
+  const pages=S.pages.filter(p=>p.use);if(!pages.length)return;
+  S.reading=true;render();
+  const P=S.P;let added=0;
+  for(const pg of pages){
+    pg.st='run';render();
+    let j=null;
+    for(let attempt=0;attempt<2&&!j;attempt++){
+      try{const res=await S.sample(PROMPT(pg.n,S.pages.length),{images:[pg.blob],modelTier:'complex'});j=parseJSON(res.text)}
+      catch(e){if(e&&e.code==='not_granted'){S.sample=null;toast('לא ניתנה הרשאה לקריאה אוטומטית');pg.st='err';S.reading=false;render();return}
+        if(e&&(e.code==='rate_limited'||/429|quota|exhaust/i.test(e.message||'')))await new Promise(r=>setTimeout(r,6000));if(attempt)pg.err=(e&&e.message)||'שגיאה'}
+    }
+    if(!j){pg.st='err';render();continue}
+    const pj=j.project||{};
+    const setF=(k,v)=>{if(v==null||v==='')return;if(P[k]==null||P[k]===''){P[k]=v;P.src[k]='pdf'}};
+    setF('num',pj.number);setF('name',pj.name);setF('desc',pj.description);setF('company',pj.company);setF('pm',pj.project_manager);
+    setF('finalDate',toISO(pj.final_account_date));setF('deliveryDate',toISO(pj.delivery_date));setF('area',num(pj.area_sqm));
+    (j.rows||[]).forEach(x=>{
+      const r={id:uid(),sup:String(x.supplier||'').trim(),svc:String(x.service||'').trim(),excl:num(x.amount_excl_vat),incl:num(x.amount_incl_vat),rate:null,calc:'',page:pg.n,note:String(x.note||''),ok:false,src:'pdf',ai:{cat:CATMAP[x.category]||'unknown',conf:+x.confidence||0}};
+      if(!r.sup&&!r.svc&&r.incl==null&&r.excl==null)return;
+      fixVat(r);const s=suggest(r,r.ai);r.cat=s.cat;r.catSrc=s.src;P.rows.push(r);added++});
+    if(num(j.total_incl_vat))P.reportIncl=num(j.total_incl_vat);
+    if(num(j.total_excl_vat))P.reportExcl=num(j.total_excl_vat);
+    if(j.warnings)pg.err=String(j.warnings);
+    pg.st='done';touch();render();
+  }
+  S.reading=false;toast(`נקלטו ${added} שורות. עברו ל"שורות ובדיקה".`);render();
+}
+
+/* ---------- views ---------- */
+function newProject(){S.P={id:uid(),createdAt:Date.now(),updatedAt:Date.now(),src:{},rows:[],devCost:900,bnm:15};S.pages=[];S.tab='read';S.view='edit';S.open={};render()}
+function openProject(id){const p=S.projects.find(x=>x.id===id);if(!p)return;S.P=JSON.parse(JSON.stringify(p));S.P.src=S.P.src||{};S.P.rows=S.P.rows||[];S.pages=[];classifyAll(true);S.tab=S.P.rows.length?'rows':'read';S.view='edit';S.open={};render()}
+
+function stats(){
+  const P=S.P,rows=P.rows||[];
+  const missing=FIELDS.filter(f=>f[2]&&(P[f[0]]==null||P[f[0]]==='')).length;
+  const unassigned=rows.filter(r=>!r.cat).length;
+  const sug=rows.filter(r=>r.cat&&(r.catSrc==='rule'||r.catSrc==='ai')).length;
+  const unchecked=rows.filter(r=>!r.ok&&r.cat!=='skip').length,skip=rows.filter(r=>r.cat==='skip').length;
+  const inc=rows.filter(r=>r.cat!=='skip');
+  const sI=inc.reduce((s,r)=>s+(+r.incl||0),0),sE=inc.reduce((s,r)=>s+(+r.excl||0),0);
+  const dI=P.reportIncl?sI-P.reportIncl:null,dE=P.reportExcl?sE-P.reportExcl:null;
+  return {missing,unassigned,sug,unchecked,skip,sI,sE,dI,dE,n:rows.length};
+}
+function render(){
+  const app=$('#app');
+  const top=S.view!=='login'&&S.view!=='boot';['#btnHome','#btnVat'].forEach(x=>$(x).hidden=!top);$('#btnOut').hidden=!(top&&S.user);$('#who').textContent=S.user?S.user.email:'';
+  if(S.view==='boot'){app.innerHTML='<p class="muted">טוען…</p>';return}
+  if(S.view==='login'){app.innerHTML=loginView();bindLogin();return}
+  if(S.view==='list'){app.innerHTML=listView();bindList();return}
+  const st=stats();
+  const tabs=[['read','1. קריאת הדוח',S.pages.length?`<span class="badge">${S.pages.length} עמ'</span>`:''],
+    ['proj','2. נתוני פרויקט',st.missing?`<span class="badge b">${st.missing}</span>`:'<span class="badge ok">✓</span>'],
+    ['rows','3. שורות ובדיקה',st.n?`<span class="badge ${st.unchecked?'w':'ok'}">${st.n-st.skip-st.unchecked}/${st.n-st.skip}</span>`:''],
+    ['cls','4. סיווג',st.unassigned?`<span class="badge b">${st.unassigned} שאלות</span>`:st.sug?`<span class="badge w">${st.sug} לאישור</span>`:st.n?'<span class="badge ok">✓</span>':''],
+    ['exp','5. הפקת אקסל','']];
+  app.innerHTML=`<div class="row" style="justify-content:space-between"><div><h2>${esc(S.P.name||'פרויקט חדש')}</h2><div class="muted small">${S.P.num?'פרויקט מס\' '+esc(S.P.num)+' · ':''}${S.P.pdfName?esc(S.P.pdfName)+' · ':''}עודכן ${fmtDT(new Date(S.P.updatedAt))}</div></div></div>
+  <div class="tabs" role="tablist">${tabs.map(t=>`<button role="tab" data-tab="${t[0]}" class="${S.tab===t[0]?'on':''}">${t[1]}${t[2]}</button>`).join('')}</div>
+  <div id="pane">${({read:readView,proj:projView,rows:rowsView,cls:clsView,exp:expView})[S.tab]()}</div>`;
+  app.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{S.tab=b.dataset.tab;render()});
+  ({read:bindRead,proj:bindProj,rows:bindRows,cls:bindCls,exp:bindExp})[S.tab]();
+}
+function loginView(){return `<div style="max-width:380px;margin:8vh auto"><h2>כניסה</h2><p class="muted">כניסה עם משתמש שנפתח עבורך במערכת.</p>
+  <form id="lf" class="chk"><input id="le" type="email" placeholder="דוא&quot;ל" autocomplete="username" required><input id="lp" type="password" placeholder="סיסמה" autocomplete="current-password" required>
+  <button class="pri" type="submit">כניסה</button><button type="button" class="ghost" id="lr">שכחתי סיסמה</button><div id="lm" class="small" style="background:none;padding:0"></div></form></div>`}
+function bindLogin(){const m=$('#lm');
+  $('#lf').onsubmit=async e=>{e.preventDefault();m.textContent='מתחבר…';try{await S.auth.signIn($('#le').value.trim(),$('#lp').value)}catch(x){m.textContent=/invalid|wrong|not-found|credential/.test(x.code||'')?'דוא"ל או סיסמה שגויים':'הכניסה נכשלה: '+(x.code||x.message)}};
+  $('#lr').onclick=async()=>{const e=$('#le').value.trim();if(!e){m.textContent='הקלידו דוא"ל ואז לחצו שוב';return}try{await S.auth.reset(e);m.textContent='נשלח מייל לאיפוס סיסמה'}catch(x){m.textContent='לא ניתן לשלוח: '+(x.code||x.message)}}}
+function listView(){
+  const q=S.q.trim();const ps=S.projects.filter(p=>!q||[p.name,p.num,p.company].join(' ').includes(q));
+  return `<div class="row" style="justify-content:space-between;margin-bottom:14px"><div><h2>פרויקטים</h2><p class="muted" style="margin:0">כל חשבון סופי הוא פרויקט: מעלים את הדוח, בודקים, מסווגים ומפיקים אקסל.</p></div>
+  <button class="pri" id="btnNew">+ חשבון סופי חדש</button></div>
+  ${!S.db?'<p class="chip pdf" style="margin-bottom:10px">מצב מקומי: לא הוגדר Firebase – הנתונים נשמרים בדפדפן זה בלבד והקריאה האוטומטית כבויה</p>':''}
+  <input id="q" placeholder="חיפוש לפי שם, מספר או חברה" value="${esc(S.q)}" style="max-width:420px;margin-bottom:12px">
+  ${ps.length?`<div class="tblwrap" style="max-height:none"><table class="list"><thead><tr><th>מס'</th><th>שם הפרויקט</th><th>חברה מבצעת</th><th class="n">סה"כ כולל מע"מ</th><th>שורות</th><th>עודכן</th><th></th></tr></thead><tbody>
+  ${ps.map(p=>{const rows=p.rows||[];const t=rows.filter(r=>r.cat!=='skip').reduce((s,r)=>s+(+r.incl||0),0);const un=rows.filter(r=>!r.cat).length;
+   return `<tr data-id="${esc(p.id)}"><td>${esc(p.num||'')}</td><td><b>${esc(p.name||'ללא שם')}</b></td><td>${esc(p.company||'')}</td><td class="n">${money0(t)}</td><td>${rows.length}${un?` <span class="chip miss">${un} לא משויכות</span>`:''}</td><td class="small muted">${fmtDT(new Date(p.updatedAt))}</td><td><button class="sm ghost" data-del="${esc(p.id)}" aria-label="מחיקה">מחיקה</button></td></tr>`}).join('')}
+  </tbody></table></div>`:`<div class="drop"><h3>עדיין אין פרויקטים</h3><p class="muted">לחצו "חשבון סופי חדש" והעלו את ה-PDF הסרוק.</p></div>`}`;
+}
+function bindList(){
+  $('#btnNew').onclick=newProject;
+  const q=$('#q');if(q)q.oninput=()=>{S.q=q.value;const p=q.selectionStart;render();const n=$('#q');n.focus();n.setSelectionRange(p,p)};
+  document.querySelectorAll('tr[data-id]').forEach(tr=>tr.onclick=e=>{if(e.target.closest('[data-del]'))return;openProject(tr.dataset.id)});
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const p=S.projects.find(x=>x.id===b.dataset.del);
+    dialog(`<h3>למחוק את "${esc(p.name||'ללא שם')}"?</h3><p class="muted">המחיקה סופית ולא ניתן לשחזר.</p><div class="row"><button class="pri" data-ok>מחיקה</button><button data-x>ביטול</button></div>`,async el=>{
+      el.querySelector('[data-ok]').onclick=async()=>{closeDlg();if(S.db){try{await S.db.doc('projects/'+p.id).delete()}catch(e){toast('המחיקה נכשלה');return}}S.projects=S.projects.filter(x=>x.id!==p.id);if(!S.db)LS.set('projects',S.projects);render()}})});
+}
+function readView(){
+  const done=S.pages.filter(p=>p.st==='done').length,use=S.pages.filter(p=>p.use).length;
+  return `<div class="drop" id="drop"><h3>${S.pages.length?'הדוח נטען':'העלאת החשבון הסופי (PDF סרוק)'}</h3>
+   <p class="muted">${S.pages.length?`${S.pages.length} עמודים. סמנו אילו עמודים לקרוא ולחצו "קרא את הדוח".`:'גררו לכאן קובץ PDF או בחרו קובץ. הדוח נשאר במחשב – נשלחות לקריאה רק תמונות העמודים שתסמנו.'}</p>
+   <label class="row" style="justify-content:center"><input type="file" id="file" accept="application/pdf" style="max-width:330px"></label>
+   ${S.P.pdfName&&!S.pages.length?`<p class="small muted">בפרויקט זה נקרא בעבר הקובץ "${esc(S.P.pdfName)}". כדי לראות אותו לצד הטבלה – העלו אותו שוב (לא תתבצע קריאה חוזרת אלא אם תבקשו).</p>`:''}
+  </div>
+  ${S.pages.length?`<div class="row" style="margin-top:14px"><button class="pri" id="btnRead" ${S.reading||!use||!S.sample?'disabled':''}>${S.reading?'קורא…':`קרא את הדוח (${use} עמ')`}</button>
+   ${!S.sample?'<span class="chip miss">קריאה אוטומטית לא זמינה בתצוגה זו – אפשר להזין ידנית בשלב 3</span>':''}
+   ${S.P.rows.length?`<span class="muted small">כבר קיימות ${S.P.rows.length} שורות – קריאה נוספת תוסיף שורות.</span>`:''}</div>
+   ${S.reading||done?`<div class="prog"><i style="width:${use?done/use*100:0}%"></i></div>`:''}
+   <div class="pages">${S.pages.map(p=>`<div class="pg ${p.st}"><img src="${p.url}" alt="עמוד ${p.n}"><label class="row" style="margin-top:6px;gap:6px"><input type="checkbox" data-use="${p.n}" ${p.use?'checked':''} style="width:auto"> עמוד ${p.n}</label>
+   <div class="small muted">${p.st==='run'?'קורא…':p.st==='done'?'✓ נקרא':p.st==='err'?'לא נקרא':''}</div>${p.err?`<div class="small" style="color:var(--badInk)">${esc(p.err)}</div>`:''}</div>`).join('')}</div>`:''}
+  <p style="margin-top:18px"><button id="btnSkip" class="ghost">המשך ללא קריאה אוטומטית ←</button></p>`;
+}
+function bindRead(){
+  const f=$('#file'),d=$('#drop');
+  if(f)f.onchange=()=>f.files[0]&&loadPdf(f.files[0]).catch(e=>toast('לא ניתן לפתוח את הקובץ'));
+  if(d){d.ondragover=e=>{e.preventDefault();d.classList.add('over')};d.ondragleave=()=>d.classList.remove('over');d.ondrop=e=>{e.preventDefault();d.classList.remove('over');const x=e.dataTransfer.files[0];if(x)loadPdf(x).catch(()=>toast('לא ניתן לפתוח את הקובץ'))}}
+  document.querySelectorAll('[data-use]').forEach(c=>c.onchange=()=>{S.pages.find(p=>p.n==c.dataset.use).use=c.checked;render()});
+  const b=$('#btnRead');if(b)b.onclick=readPdf;
+  $('#btnSkip').onclick=()=>{S.tab='proj';render()};
+}
+function projView(){
+  const P=S.P,v=projVat();
+  return `<p class="muted" style="margin-top:0">שדות שהמערכת קראה מהדוח מסומנים <span class="chip pdf">נקרא מהדוח – לבדיקה</span>, שדות שהוקלדו <span class="chip man">הוקלד</span>, וחובה שחסרים <span class="chip miss">להשלמה</span>. אפשר לתקן כל שדה.</p>
+  <div class="grid">${FIELDS.map(([k,l,req,t])=>{const v=P[k]==null?'':P[k];const empty=v==='';const s=P.src[k];
+   const chip=empty?(req?'<span class="chip miss">להשלמה</span>':''):s==='pdf'?'<span class="chip pdf">נקרא מהדוח – לבדיקה</span>':'<span class="chip man">הוקלד</span>';
+   const inp=t==='ta'?`<textarea data-f="${k}">${esc(v)}</textarea>`:`<input data-f="${k}" ${t==='date'?'type="date"':t==='num'?'inputmode="decimal"':''} value="${esc(v)}">`;
+   return `<div class="fld" ${t==='ta'?'style="grid-column:1/-1"':''}><label for="f_${k}"><span>${l}${req?' *':''}</span>${chip}</label>${inp.replace('data-f=','id="f_'+k+'" data-f=')}</div>`}).join('')}
+   <div class="fld"><label><span>שיעור מע"מ ברירת מחדל לפרויקט</span><span class="chip">${P.vatOverride?'נקבע ידנית':'לפי תאריך החשבון'}</span></label>
+   <select id="vatO"><option value="">אוטומטי לפי תאריך (${vatFor(P.finalDate,S.vat)}%)</option>${[...new Set(S.vat.map(x=>x.rate))].map(r=>`<option value="${r}" ${+P.vatOverride===r?'selected':''}>${r}%</option>`).join('')}</select></div>
+   <div class="fld"><label><span>סה"כ כולל מע"מ לפי הדוח (להשוואה)</span>${P.reportIncl?'<span class="chip pdf">נקרא מהדוח</span>':''}</label><input data-f="reportIncl" inputmode="decimal" value="${esc(P.reportIncl||'')}"></div>
+   <div class="fld"><label><span>סה"כ ללא מע"מ לפי הדוח (להשוואה)</span>${P.reportExcl?'<span class="chip pdf">נקרא מהדוח</span>':''}</label><input data-f="reportExcl" inputmode="decimal" value="${esc(P.reportExcl||'')}"></div>
+  </div>
+  <div class="row" style="margin-top:18px">${Object.values(P.src).includes('pdf')?'<button id="confAll">אישור כל השדות שנקראו</button>':''}<button class="pri" id="nx">המשך לשורות ←</button></div>`;
+}
+function bindProj(){
+  document.querySelectorAll('[data-f]').forEach(i=>i.onchange=()=>{const k=i.dataset.f;const f=FIELDS.find(x=>x[0]===k);let v=i.value.trim();if((f&&f[3]==='num')||k.startsWith('report'))v=num(v);
+    S.P[k]=v;if(!k.startsWith('report'))S.P.src[k]=v===''||v==null?'':'manual';if(k==='finalDate')S.P.rows.forEach(r=>{if(r.calc&&r.rate==null)fixVat(r)});touch();rr()});
+  $('#vatO').onchange=e=>{S.P.vatOverride=e.target.value?+e.target.value:null;S.P.rows.forEach(r=>{if(r.calc&&r.rate==null)fixVat(r)});touch();render()};
+  const c=$('#confAll');if(c)c.onclick=()=>{for(const k in S.P.src)if(S.P.src[k]==='pdf')S.P.src[k]='manual';touch();render()};
+  $('#nx').onclick=()=>{S.tab='rows';render()};
+}
+function groups(){const m=new Map();S.P.rows.forEach(r=>{const k=gkey(r);if(!m.has(k))m.set(k,[]);m.get(k).push(r)});return [...m.entries()]}
+function catSel(val,attr){return `<select ${attr} aria-label="שיוך"><option value="">— לא משויך —</option>${Object.entries(CATS).map(([k,l])=>`<option value="${k}" ${val===k?'selected':''}>${l}</option>`).join('')}${val==='mixed'?'<option value="mixed" selected>מעורב</option>':''}</select>`}
+const fx=v=>v==null||v===''?'':(Number.isInteger(+v)?String(v):(+v).toFixed(2));
+function rowTr(r,child){
+  const flag=vatFlag(r);
+  return `<tr class="${child?'child':''} ${r.ok?'ok':''}" data-r="${r.id}">
+  <td><input type="checkbox" data-ok ${r.ok?'checked':''} aria-label="נבדק" style="width:auto"></td>
+  <td><input data-k="sup" value="${esc(r.sup)}" aria-label="ספק"></td>
+  <td><input data-k="svc" value="${esc(r.svc)}" aria-label="סוג שירות"></td>
+  <td class="n"><input class="num" data-k="excl" value="${fx(r.excl)}" aria-label="ללא מע&quot;מ" title="${r.calc==='excl'?'חושב מהסכום כולל מע&quot;מ':''}" style="${r.calc==='excl'?'font-style:italic':''}"></td>
+  <td class="n"><input class="num" data-k="incl" value="${fx(r.incl)}" aria-label="כולל מע&quot;מ" style="${r.calc==='incl'?'font-style:italic':''}"></td>
+  <td><select data-k="rate" aria-label="מע&quot;מ" style="width:74px"><option value="">${r.calc?projVat()+'%':(implied(r)!=null?implied(r).toFixed(1)+'%':'—')}</option>${[...new Set(S.vat.map(x=>x.rate))].map(v=>`<option value="${v}" ${r.rate===v?'selected':''}>${v}%</option>`).join('')}</select>${flag?`<span title="שיעור המע&quot;מ בשורה אינו תואם שיעור ידוע – לבדוק">${flag}</span>`:''}</td>
+  <td>${catSel(r.cat,'data-k="cat"')}</td>
+  <td class="small muted" style="text-align:center"><button class="sm ghost" data-pg="${r.page||''}" ${r.page?'':'disabled'}>${r.page||'—'}</button></td>
+  <td><input data-k="note" value="${esc(r.note)}" aria-label="הערה" placeholder="הערה"></td>
+  <td><button class="sm ghost" data-delr aria-label="מחיקת שורה">✕</button></td></tr>`;
+}
+function rowsView(){
+  const st=stats(),P=S.P;const gs=groups();
+  const recon=(P.reportIncl||P.reportExcl)?`<div class="recon ${Math.abs(st.dI||0)<1&&Math.abs(st.dE||0)<1?'good':'diff'}">
+   <span>סה"כ שורות כולל מע"מ: <b>${money(st.sI)}</b></span>${P.reportIncl?`<span>לפי הדוח: <b>${money(P.reportIncl)}</b></span><span>הפרש: <b>${money(st.dI)}</b></span>`:''}
+   ${P.reportExcl?`<span>ללא מע"מ: <b>${money(st.sE)}</b> מול <b>${money(P.reportExcl)}</b> (הפרש <b>${money(st.dE)}</b>)</span>`:''}</div>`
+   :`<div class="recon"><span>סה"כ שורות כולל מע"מ: <b>${money(st.sI)}</b> · ללא מע"מ: <b>${money(st.sE)}</b></span><span class="muted">להשוואה מול הדוח הזינו את הסה"כ בשלב 2</span></div>`;
+  const body=S.grouped?gs.map(([k,rs])=>{if(rs.length===1)return rowTr(rs[0]);const open=S.open[k];
+    const cats=[...new Set(rs.map(r=>r.cat||''))];const c=cats.length===1?cats[0]:'mixed';const allOk=rs.every(r=>r.ok);
+    return `<tr class="grp" data-g="${esc(k)}"><td><input type="checkbox" data-gok ${allOk?'checked':''} aria-label="נבדק" style="width:auto"></td>
+     <td colspan="2"><button class="sm ghost" data-tg aria-expanded="${!!open}">${open?'▾':'◂'}</button> ${esc(rs[0].sup)} · ${esc(rs[0].svc)} <span class="chip">${rs.length} שורות</span></td>
+     <td class="n">${money(rs.reduce((s,r)=>s+(+r.excl||0),0))}</td><td class="n">${money(rs.reduce((s,r)=>s+(+r.incl||0),0))}</td><td></td>
+     <td>${catSel(c,'data-gcat')}</td><td></td><td></td><td></td></tr>${open?rs.map(r=>rowTr(r,1)).join(''):''}`}).join('')
+   :P.rows.map(r=>rowTr(r)).join('');
+  return `${recon}<div class="bar2"><span class="seg"><button data-gr="1" class="${S.grouped?'on':''}">מקובץ לפי ספק</button><button data-gr="0" class="${S.grouped?'':'on'}">כל השורות</button></span>
+   ${S.grouped?'<button class="sm" id="expAll">פתח הכל</button><button class="sm" id="colAll">כווץ הכל</button>':''}
+   <button class="sm" id="addR">+ שורה</button><button class="sm" id="okAll">סמן הכל כנבדק</button>${S.pages.length?`<button class="sm" id="hv">${S.hideV?'הצג דוח':'הסתר דוח'}</button>`:`<span class="small muted">${S.P.pdfName?'להצגת הדוח לצד הטבלה העלו אותו שוב בשלב 1':''}</span>`}
+   <span class="muted small">נבדקו ${st.n-st.skip-st.unchecked} מתוך ${st.n-st.skip}</span></div>
+  <div class="split ${S.hideV||!S.pages.length?'nov':''}">${S.hideV||!S.pages.length?'':S.pages.length?`<div class="viewer"><div class="bar"><span class="small">עמוד</span>${S.pages.map((p,i)=>`<button class="sm ${S.pageSel===i?'pri':''}" data-vp="${i}">${p.n}</button>`).join('')}<span style="flex:1"></span><button class="sm" data-z="-1" aria-label="הקטנה">−</button><button class="sm" data-z="1" aria-label="הגדלה">+</button></div>
+   <div class="img"><img src="${S.pages[S.pageSel]?S.pages[S.pageSel].url:''}" alt="עמוד מהדוח" style="width:${S.zoom*100}%"></div></div>`
+   :`<div class="viewer"><div style="padding:20px" class="muted small">${S.P.pdfName?`להצגת הדוח לצד הטבלה העלו שוב את "${esc(S.P.pdfName)}" בשלב 1.`:'לא הועלה דוח. אפשר להזין שורות ידנית.'}</div></div>`}
+  <div class="tblwrap"><table class="rt"><thead><tr><th>✓</th><th>שם ספק</th><th>סוג שירות / תפקיד</th><th class="n">ללא מע"מ</th><th class="n">כולל מע"מ</th><th>מע"מ</th><th>שיוך</th><th>עמ'</th><th>הערה</th><th></th></tr></thead>
+  <tbody>${body||'<tr><td colspan="10" class="muted" style="padding:30px;text-align:center">אין שורות עדיין. קראו את הדוח בשלב 1 או הוסיפו שורה.</td></tr>'}</tbody></table></div></div>
+  <p class="small muted">סכום בכתב נטוי = חושב אוטומטית לפי שיעור המע"מ. ⚠ = היחס בין הסכומים לא תואם שיעור מע"מ ידוע.</p>`;
+}
+function rr(){setTimeout(()=>{const a=document.activeElement;let sel=null,pos=null;
+  if(a&&a.matches&&a.matches('input,select,textarea')){const tr=a.closest('tr[data-r]');const k=a.dataset.k||a.dataset.f;
+    if(tr&&k)sel=`tr[data-r="${tr.dataset.r}"] [data-k="${k}"]`;else if(a.dataset.f)sel=`[data-f="${a.dataset.f}"]`;try{pos=a.selectionStart}catch(e){}}
+  render();if(sel){const n=document.querySelector(sel);if(n){n.focus();try{if(pos!=null)n.setSelectionRange(pos,pos)}catch(e){}}}},0)}
+function rowById(id){return S.P.rows.find(r=>r.id===id)}
+function bindRows(){
+  document.querySelectorAll('[data-gr]').forEach(b=>b.onclick=()=>{S.grouped=b.dataset.gr==='1';render()});
+  const ea=$('#expAll');if(ea)ea.onclick=()=>{groups().forEach(([k])=>S.open[k]=true);render()};
+  const ca=$('#colAll');if(ca)ca.onclick=()=>{S.open={};render()};
+  $('#addR').onclick=()=>{const r={id:uid(),sup:'',svc:'',excl:null,incl:null,rate:null,calc:'',page:S.pages[S.pageSel]?S.pages[S.pageSel].n:null,note:'',ok:false,src:'manual',cat:''};S.P.rows.push(r);S.grouped=false;touch();render();const tr=document.querySelector(`tr[data-r="${r.id}"] input[data-k=sup]`);if(tr)tr.focus()};
+  const hv=$('#hv');if(hv)hv.onclick=()=>{S.hideV=!S.hideV;render()};
+  $('#okAll').onclick=()=>{S.P.rows.forEach(r=>r.ok=true);touch();render()};
+  document.querySelectorAll('[data-vp]').forEach(b=>b.onclick=()=>{S.pageSel=+b.dataset.vp;render()});
+  document.querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{S.zoom=Math.max(.5,Math.min(3,S.zoom+(+b.dataset.z)*.25));render()});
+  document.querySelectorAll('tr[data-r]').forEach(tr=>{const r=rowById(tr.dataset.r);if(!r)return;
+    tr.querySelector('[data-ok]').onchange=e=>{r.ok=e.target.checked;touch();render()};
+    tr.querySelectorAll('[data-k]').forEach(i=>i.onchange=()=>{const k=i.dataset.k;let v=i.value;
+      if(k==='excl'||k==='incl'){const o=k==='excl'?'incl':'excl';r[k]=num(v);
+        if(r.calc===o||r[o]==null){r.calc=o;fixVat(r)}else if(r.calc===k)r.calc=''}
+      else if(k==='rate'){r.rate=v===''?null:+v;if(!r.calc)r.calc='excl';fixVat(r)}
+      else if(k==='cat'){r.cat=v;r.catSrc='user';if(v&&v!=='skip')rememberSupplier(r,v)}
+      else r[k]=v.trim();
+      if((k==='sup'||k==='svc')&&!r.cat){const s=suggest(r,r.ai);r.cat=s.cat;r.catSrc=s.src}
+      touch();rr()});
+    const pg=tr.querySelector('[data-pg]');if(pg)pg.onclick=()=>{const i=S.pages.findIndex(p=>p.n==pg.dataset.pg);if(i>=0){S.pageSel=i;render()}};
+    tr.querySelector('[data-delr]').onclick=()=>{const i=S.P.rows.indexOf(r);S.P.rows.splice(i,1);S.undo={r,i};touch();render();toast('השורה נמחקה',[['ביטול',()=>{S.P.rows.splice(S.undo.i,0,S.undo.r);touch();render()}]])};
+  });
+  document.querySelectorAll('tr[data-g]').forEach(tr=>{const k=tr.dataset.g;const rs=S.P.rows.filter(r=>gkey(r)===k);
+    tr.querySelector('[data-tg]').onclick=()=>{S.open[k]=!S.open[k];render()};
+    tr.querySelector('[data-gok]').onchange=e=>{rs.forEach(r=>r.ok=e.target.checked);touch();render()};
+    tr.querySelector('[data-gcat]').onchange=e=>{const v=e.target.value;if(v==='mixed')return;rs.forEach(r=>{r.cat=v;r.catSrc='user'});if(v&&v!=='skip')rememberSupplier(rs[0],v);touch();render()};
+  });
+}
+function clsView(){
+  const gs=groups();const P=S.P;
+  const un=gs.filter(([k,rs])=>rs.some(r=>!r.cat));
+  const sg=gs.filter(([k,rs])=>rs.every(r=>r.cat)&&rs.some(r=>r.catSrc==='rule'||r.catSrc==='ai'));
+  const tot={};Object.keys(CATS).forEach(c=>tot[c]=0);P.rows.forEach(r=>{if(r.cat)tot[r.cat]+=+r.incl||0});
+  const all=Object.entries(tot).filter(([c])=>c!=='skip').reduce((s,[,v])=>s+v,0);
+  const qCard=([k,rs],mode)=>{const r=rs[0];const sI=rs.reduce((s,x)=>s+(+x.incl||0),0);const cur=rs[0].cat;
+    return `<div class="q" data-q="${esc(k)}"><div class="h"><div><b>${esc(r.sup||'ללא שם ספק')}</b> · ${esc(r.svc||'ללא תיאור')}${rs.length>1?` <span class="chip">${rs.length} שורות</span>`:''}</div><b class="n">${money(sI)} ₪</b></div>
+    ${mode==='q'?'<div>לאיזה גורם לשייך את הסכום?</div>':`<div class="small">הצעת המערכת: <span class="chip sug">${CATS[cur]}</span> <span class="muted">(${rs[0].catSrc==='ai'?'לפי קריאת הדוח':'לפי סוג השירות'})</span></div>`}
+    <div class="opts">${Object.entries(CATS).map(([c,l])=>`<button class="sm ${mode==='s'&&c===cur?'pri':''}" data-c="${c}">${l}</button>`).join('')}</div>
+    <label class="row small muted" style="gap:6px"><input type="checkbox" data-rem checked style="width:auto"> לזכור את השיוך לספק זה בפרויקטים הבאים</label></div>`};
+  return `<div class="cats">${['exec','plan','mgmt','fee','levy'].map(c=>`<div class="cat"><span class="small muted">${CATS[c]}</span><b>${money0(tot[c])}</b><span class="small muted">${all?(tot[c]/all*100).toFixed(1)+'%':''}</span></div>`).join('')}</div>
+  <h3>שאלות פתוחות ${un.length?`<span class="badge b">${un.length}</span>`:'<span class="badge ok">אין</span>'}</h3>
+  <p class="muted small">המערכת לא הצליחה לשייך את השורות האלה. בחרו לכל אחת את הגורם.</p>
+  ${un.map(g=>qCard(g,'q')).join('')||'<p class="muted">כל השורות משויכות.</p>'}
+  <h3 style="margin-top:24px">הצעות לאישור ${sg.length?`<span class="badge w">${sg.length}</span>`:''}</h3>
+  ${sg.length?`<p class="muted small">המערכת שייכה לפי סוג השירות או לפי קריאת הדוח. אשרו או שנו.</p><button class="pri" id="accAll" style="margin-bottom:10px">אישור כל ההצעות (${sg.length})</button>${sg.map(g=>qCard(g,'s')).join('')}`:'<p class="muted">אין הצעות פתוחות.</p>'}`;
+}
+function bindCls(){
+  document.querySelectorAll('[data-q]').forEach(el=>{const k=el.dataset.q;const rs=S.P.rows.filter(r=>gkey(r)===k);
+    el.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{const c=b.dataset.c;rs.forEach(r=>{r.cat=c;r.catSrc='user'});if(el.querySelector('[data-rem]').checked&&c!=='skip')rememberSupplier(rs[0],c);touch();render()})});
+  const a=$('#accAll');if(a)a.onclick=()=>{const seen=new Set();S.P.rows.forEach(r=>{if(r.cat&&(r.catSrc==='rule'||r.catSrc==='ai')){r.catSrc='user';const k=gkey(r);if(!seen.has(k)&&r.cat!=='skip'){seen.add(k);rememberSupplier(r,r.cat)}}});touch();render()};
+}
+function expView(){
+  const st=stats(),P=S.P;
+  const items=[[!st.missing,st.missing?`חסרים ${st.missing} שדות חובה בנתוני הפרויקט`:'נתוני הפרויקט מלאים'],
+    [!st.unassigned,st.unassigned?`${st.unassigned} שורות לא משויכות – לא ייכללו בטבלה`:'כל השורות משויכות'],
+    [!st.sug,st.sug?`${st.sug} שיוכים מוצעים עדיין לא אושרו`:'כל השיוכים אושרו'],
+    [!st.unchecked,st.unchecked?`${st.unchecked} שורות עדיין לא סומנו כנבדקו`:'כל השורות נבדקו'],
+    [P.reportIncl?Math.abs(st.dI)<1:false,P.reportIncl?(Math.abs(st.dI)<1?'הסה"כ תואם לדוח':`הפרש של ${money(st.dI)} ₪ מול סה"כ הדוח`):'לא הוזן סה"כ הדוח להשוואה']];
+  return `<h3>לפני ההפקה</h3><div class="chk">${items.map(([ok,t])=>`<div class="${ok?'ok':'w'}">${ok?'✓':'!'} ${t}</div>`).join('')}</div>
+  <div class="row" style="margin:16px 0"><span>שורות של אותו ספק ואותו שירות:</span><span class="seg"><button data-eg="1" class="${S.expGrouped?'on':''}">שורה אחת מסכמת</button><button data-eg="0" class="${S.expGrouped?'':'on'}">כל שורה בנפרד</button></span></div>
+  <p class="muted small">הקובץ כולל גיליון "ניתוח עלויות" במבנה התבנית (נתונים כלליים, פרקים 2–6, ריכוז ועלות למ"ר) עם נוסחאות, וגיליון "פירוט שורות מהדוח". תאריך העדכון האחרון מופיע בפינה העליונה.</p>
+  <div class="row"><button class="pri" id="dl" ${S.dl?'':'disabled'}>הורדת קובץ Excel</button>${S.dl?'':'<span class="chip miss">הורדה לא זמינה בתצוגה זו</span>'}</div>`;
+}
+function bindExp(){
+  document.querySelectorAll('[data-eg]').forEach(b=>b.onclick=()=>{S.expGrouped=b.dataset.eg==='1';render()});
+  const b=$('#dl');if(b)b.onclick=async()=>{
+    try{const P=S.P;const wb=buildWB(ExcelJS,P,{grouped:S.expGrouped,vat:projVat()});const buf=await wb.xlsx.writeBuffer();
+      const d=new Date(P.updatedAt);const p=n=>String(n).padStart(2,'0');
+      const fn=`ניתוח עלויות - ${P.num?'פרויקט '+P.num+' - ':''}${(P.name||'ללא שם').replace(/[\\/:*?"<>|]/g,'')} - ${p(d.getDate())}${p(d.getMonth()+1)}${d.getFullYear()}.xlsx`;
+      await S.dl.save({filename:fn,data:new Blob([buf])});toast('הקובץ ירד למחשב')}
+    catch(e){if(e&&e.code==='declined')return;toast('ההורדה לא הושלמה'+(e&&e.message?': '+e.message:''))}};
+}
+/* ---------- dialogs ---------- */
+function dialog(html,bind){$('#layer').innerHTML=`<div class="dlg" role="dialog" aria-modal="true"><div>${html}</div></div>`;const el=$('#layer .dlg>div');el.querySelectorAll('[data-x]').forEach(b=>b.onclick=closeDlg);$('#layer .dlg').onclick=e=>{if(e.target.classList.contains('dlg'))closeDlg()};bind&&bind(el)}
+function closeDlg(){$('#layer').innerHTML=''}
+let toastT;function toast(t,acts){const el=document.createElement('div');el.className='toast';el.textContent=t;(acts||[]).forEach(([l,f])=>{const b=document.createElement('button');b.textContent=l;b.onclick=()=>{f();el.remove()};el.appendChild(b)});document.querySelectorAll('.toast').forEach(x=>x.remove());document.body.appendChild(el);clearTimeout(toastT);toastT=setTimeout(()=>el.remove(),6000)}
+function vatDialog(){
+  const rowsH=()=>S.vat.map((v,i)=>`<tr><td><input type="date" data-vf="${i}" value="${esc(v.from)}"></td><td><input data-vr="${i}" inputmode="decimal" value="${esc(v.rate)}" style="width:80px"></td><td><button class="sm ghost" data-vd="${i}">✕</button></td></tr>`).join('');
+  dialog(`<h3>שיעורי מע"מ לפי תאריך</h3><p class="muted small">המערכת בוחרת את השיעור לפי תאריך החשבון הסופי. אפשר לשנות שיעור לכל שורה בנפרד בטבלה.</p>
+   <table><thead><tr><th>בתוקף מתאריך</th><th>שיעור %</th><th></th></tr></thead><tbody id="vt">${rowsH()}</tbody></table>
+   <div class="row" style="margin-top:12px"><button class="sm" id="va">+ שיעור חדש</button><span style="flex:1"></span><button class="pri" id="vs">שמירה</button><button data-x>ביטול</button></div>`,el=>{
+    const bindT=()=>{el.querySelectorAll('[data-vd]').forEach(b=>b.onclick=()=>{S.vat.splice(+b.dataset.vd,1);el.querySelector('#vt').innerHTML=rowsH();bindT()})};bindT();
+    el.querySelector('#va').onclick=()=>{S.vat.push({from:new Date().toISOString().slice(0,10),rate:18});el.querySelector('#vt').innerHTML=rowsH();bindT()};
+    el.querySelector('#vs').onclick=async()=>{S.vat=S.vat.map((v,i)=>({from:el.querySelector(`[data-vf="${i}"]`).value,rate:num(el.querySelector(`[data-vr="${i}"]`).value)})).filter(v=>v.from&&v.rate!=null).sort((a,b)=>a.from<b.from?-1:1);await saveVat();closeDlg();if(S.P){S.P.rows.forEach(r=>{if(r.calc&&r.rate==null)fixVat(r)});touch()}render()};
+  });
+}
+$('#btnHome').onclick=async()=>{if(dirty)await save();S.view='list';S.P=null;render()};
+$('#btnVat').onclick=vatDialog;
+window.addEventListener('beforeunload',e=>{if(dirty){save();e.preventDefault()}});
+/* ---------- start ---------- */
+$('#btnOut').onclick=async()=>{if(dirty)await save();S.P=null;await S.auth.signOut()};
+S.view='boot';render();
+S.dl={save:async({filename,data})=>{const u=URL.createObjectURL(data instanceof Blob?data:new Blob([data]));const a=document.createElement('a');a.href=u;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000);return {status:'saved'}}};
+(async()=>{
+  for(let i=0;!window.FA_BACKEND&&i<100;i++)await new Promise(r=>setTimeout(r,50));
+  let BE;try{BE=(await window.FA_BACKEND)||{mode:'local'}}catch(e){console.error(e);BE={mode:'local'};toast('החיבור ל-Firebase נכשל – עובדים במצב מקומי')}
+  if(BE.mode==='firebase'){
+    S.sample=BE.sample;S.auth=BE.auth;
+    BE.auth.onChange(async u=>{S.user=u||null;if(u){S.db=BE.db;S.view='boot';render();await loadAll();S.view='list'}else{S.db=null;S.view='login'}render()});
+  }else{S.view='list';await loadAll();render()}
+})();
+}
+</script>
+</body>
+</html>
